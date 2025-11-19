@@ -93,9 +93,23 @@ function initUI() {
 }
 
 function initScanner() {
-  if (typeof Html5Qrcode === "undefined") return;
-  html5Qrcode = new Html5Qrcode("scanner-region");
+  if (typeof Html5Qrcode === "undefined") {
+    console.error("Html5Qrcode no está cargado");
+    return;
+  }
+  
+  const scannerElement = document.getElementById("scanner-region");
+  if (!scannerElement) {
+    console.error("Elemento scanner-region no encontrado");
+    return;
+  }
+  
+  // Asegurar que el contenedor es visible antes de iniciar
+  scannerElement.style.display = "block";
+  document.querySelector(".scanner-placeholder").style.display = "none";
+  
   if (!scannerActivo) {
+    html5Qrcode = new Html5Qrcode("scanner-region");
     html5Qrcode
       .start(
         { facingMode: "environment" },
@@ -105,10 +119,12 @@ function initScanner() {
       )
       .then(() => {
         scannerActivo = true;
-        document.getElementById("scanner-region").style.display = "block";
-        document.querySelector(".scanner-placeholder").style.display = "none";
+        console.log("Scanner iniciado correctamente");
       })
-      .catch(console.warn);
+      .catch((error) => {
+        console.error("Error al iniciar scanner:", error);
+        alert("No se pudo acceder a la cámara. Verifica los permisos.");
+      });
   }
 }
 
