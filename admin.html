@@ -367,8 +367,10 @@
                 .then(r => r.json())
                 .then(d => {
                     if (d.status === 'ok') {
-                        alert('Archivo subido');
-                        loadConfig();
+                        alert('Archivo subido correctamente');
+                        // Auto-seleccionar y cargar
+                        currentEditingFile = d.filename;
+                        loadConfig(); // Recarga selectores
                     } else {
                         alert('Error: ' + d.message);
                     }

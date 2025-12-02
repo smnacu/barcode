@@ -39,7 +39,6 @@
         --border-color: #333333;
 
         --brand-red: #c0392b;
-        /* Keep brand color consistent or slightly adjusted */
         --brand-red-dark: #8d0801;
 
         --shadow-card: 0 4px 12px rgba(0, 0, 0, 0.3);
@@ -102,7 +101,6 @@ a {
     height: 32px;
     width: auto;
     filter: brightness(0) invert(1);
-    /* Make white on dark header */
 }
 
 .app-title {
@@ -193,7 +191,6 @@ select:focus {
 .btn {
     border: none;
     border-radius: var(--radius-pill);
-    /* Android-like pill buttons */
     padding: 12px 24px;
     font-weight: 600;
     cursor: pointer;
