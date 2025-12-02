@@ -1,66 +1,77 @@
 <!DOCTYPE html>
 <html lang="es">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>ITDelivery Scanner</title>
+    <title>Scanner - Daruma</title>
     <link rel="manifest" href="manifest.json">
     <link rel="stylesheet" href="css/styles.css">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
 </head>
+
 <body>
 
     <!-- Header -->
     <header class="app-header">
-        <div style="display:flex; align-items:center; gap:10px;">
+        <div class="logo-container">
             <img src="img/logo_bw.png" alt="Logo" class="logo">
-            <div id="status-bar" class="status-info">Sistema Online</div>
+            <div class="app-title">Daruma <span>Scanner</span></div>
         </div>
-        <a href="admin.html" class="settings-link"><i class="fa fa-cog"></i></a>
+        <div class="header-actions">
+            <div id="status-bar" class="status-info" style="font-size: 0.8rem; color: var(--success);">Online</div>
+            <a href="admin.html" class="settings-link"><i class="fa fa-cog"></i></a>
+        </div>
     </header>
 
-    <!-- Search Manual Area -->
-    <div class="search-container">
-        <div class="input-wrapper">
-            <i class="fa fa-search search-icon"></i>
-            <input type="text" id="manual-search-input" placeholder="Buscar por Código, Nombre o Art...">
-            <button id="btn-manual-search" class="btn btn-primary btn-sm">BUSCAR</button>
+    <div class="scanner-layout">
+
+        <!-- Search Manual Area -->
+        <div class="search-bar-wrapper">
+            <i class="fa fa-search" style="padding: 12px; color: var(--text-muted);"></i>
+            <input type="text" id="manual-search-input" placeholder="Buscar código o descripción..."
+                style="flex:1; border:none; background:transparent; padding:10px;">
+            <button id="btn-manual-search" class="btn btn-primary btn-sm">IR</button>
         </div>
-    </div>
 
-    <!-- Scanner Area -->
-    <main id="scanner-container" class="scanner-view">
-        <div id="reader"></div>
-        <p class="instruction">Apunte cámara o use el buscador manual</p>
-    </main>
+        <!-- Scanner Area -->
+        <main id="scanner-container" class="mt-20">
+            <div id="reader"></div>
+            <p class="instruction"><i class="fa fa-camera"></i> Apunte la cámara al código</p>
+        </main>
 
-    <!-- Result Area (Oculto por defecto) -->
-    <main id="result-panel" class="result-view hidden">
-        <div class="card">
-            <div id="info-content"></div>
-            
-            <div class="actions">
-                <button id="btn-open-pdf" class="btn btn-primary btn-lg">
-                    <i class="fa fa-file-pdf"></i> Ver Documento
-                </button>
-                <button id="btn-reset" class="btn btn-secondary btn-lg">
-                    <i class="fa fa-redo"></i> Nueva Búsqueda
-                </button>
+        <!-- Result Area (Oculto por defecto) -->
+        <main id="result-panel" class="result-view hidden mt-20">
+            <div class="card">
+                <div id="info-content"></div>
+
+                <div style="display: grid; gap: 10px; margin-top: 20px;">
+                    <button id="btn-open-pdf" class="btn btn-primary btn-lg">
+                        <i class="fa fa-file-pdf"></i> VER DOCUMENTO
+                    </button>
+                    <button id="btn-reset" class="btn btn-secondary btn-lg">
+                        <i class="fa fa-redo"></i> NUEVA BÚSQUEDA
+                    </button>
+                </div>
+
+                <div id="pdf-container" class="mt-20 text-center"></div>
             </div>
-            
-            <div id="pdf-container"></div>
-        </div>
-    </main>
+        </main>
 
-    <!-- Historial -->
-    <section id="history-section" class="history-panel">
-        <h3><i class="fa fa-history"></i> Historial Reciente</h3>
-        <div id="history-list" class="history-list">
-            <!-- Se llena con JS -->
-            <p class="text-muted">No hay búsquedas recientes.</p>
-        </div>
-        <button onclick="clearHistory()" class="btn-text-only">Borrar Historial</button>
-    </section>
+        <!-- Historial -->
+        <section id="history-section" class="history-section">
+            <div class="history-header">
+                <h3><i class="fa fa-history"></i> Recientes</h3>
+                <button onclick="clearHistory()" class="btn btn-sm btn-secondary"
+                    style="font-size: 0.7rem;">Borrar</button>
+            </div>
+            <div id="history-list" class="history-list">
+                <!-- Se llena con JS -->
+                <p class="text-muted text-center">Sin historial reciente.</p>
+            </div>
+        </section>
+
+    </div>
 
     <!-- PDF Modal Overlay -->
     <div id="pdf-modal" class="modal hidden">
@@ -82,4 +93,5 @@
         }
     </script>
 </body>
+
 </html>
