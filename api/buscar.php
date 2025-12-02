@@ -40,8 +40,17 @@ function simpleJsonEncode($data) {
 
 function buscarEnLibro($codigo, $config) {
     $csv_path = $config['ruta_csv'];
-    if (!file_exists($csv_path) && file_exists(__DIR__ . '/' . $csv_path)) {
-        $csv_path = __DIR__ . '/' . $csv_path;
+    
+    // 1. Try exact path
+    if (!file_exists($csv_path)) {
+        // 2. Try relative to __DIR__
+        if (file_exists(__DIR__ . '/' . $csv_path)) {
+            $csv_path = __DIR__ . '/' . $csv_path;
+        }
+        // 3. Try in ../csv/ folder if it's just a filename
+        elseif (file_exists(__DIR__ . '/../csv/' . basename($csv_path))) {
+            $csv_path = __DIR__ . '/../csv/' . basename($csv_path);
+        }
     }
 
     if (!file_exists($csv_path)) return ['encontrado' => false];
@@ -133,9 +142,6 @@ $res = buscarEnLibro($codigo, $config);
 if ($res['encontrado']) {
     $pdf = buscarPDF($res['producto'], $config);
     
-    // Si es URL, pdf ya es la URL. Si es local, es el nombre del archivo.
-    // El front espera 'pdf_url' y 'pdf_available'.
-    
     $pdf_url = null;
     $pdf_available = false;
     
@@ -144,15 +150,6 @@ if ($res['encontrado']) {
         if (preg_match('/^https?:\/\//i', $pdf)) {
             $pdf_url = $pdf;
         } else {
-            // Si es local, necesitamos construir la URL relativa para el navegador
-            // Asumimos que api/ver_pdf.php maneja esto o servimos directo
-            // El código original devolvía 'pdf' => nombre_archivo.
-            // Revisando app.js: btnPdf.onclick = () => openPdfViewer(data.pdf_url);
-            // Si el original devolvía 'pdf', entonces app.js estaba roto o yo leí mal.
-            // Voy a asumir que debemos devolver una URL válida.
-            // Si es local, probablemente sea 'api/ver_pdf.php?file=' . $pdf
-            // O si está en una carpeta pública...
-            // Dado que hay un 'api/ver_pdf.php' en el file list, probablemente sea ese.
             $pdf_url = 'api/ver_pdf.php?file=' . urlencode($pdf);
         }
     }
@@ -161,7 +158,7 @@ if ($res['encontrado']) {
         'error' => false,
         'encontrado' => true,
         'producto' => $res['producto'],
-        'pdf' => $pdf, // Mantener compatibilidad por si acaso
+        'pdf' => $pdf,
         'pdf_available' => $pdf_available,
         'pdf_url' => $pdf_url,
         'fuente' => $res['fuente']

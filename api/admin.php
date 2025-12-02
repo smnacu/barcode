@@ -3,7 +3,7 @@
 session_start(); // Iniciamos sesión para guardar el estado del login
 header('Content-Type: application/json');
 
-$config_file = 'config.json';
+$config_file = __DIR__ . '/config.json';
 $PASSWORD = 'queija1234'; // La clave maestra
 
 // Acciones que no requieren login
@@ -14,30 +14,31 @@ if ($action === 'login') {
     $pass = $_POST['password'] ?? '';
     if ($pass === $PASSWORD) {
         $_SESSION['auth'] = true;
-        echo json_encode(['status' => 'ok']);
+        echo json_encode(['status' => 'ok', 'success' => true]);
     } else {
-        echo json_encode(['status' => 'error', 'message' => 'Contraseña incorrecta']);
+        echo json_encode(['status' => 'error', 'message' => 'Contraseña incorrecta', 'success' => false, 'msg' => 'Contraseña incorrecta']);
     }
     exit;
 }
 
 // 2. CHECK LOGIN (Para verificar al cargar la página)
 if ($action === 'check_auth') {
-    echo json_encode(['auth' => isset($_SESSION['auth']) && $_SESSION['auth'] === true]);
+    $logged = isset($_SESSION['auth']) && $_SESSION['auth'] === true;
+    echo json_encode(['auth' => $logged, 'logged_in' => $logged]);
     exit;
 }
 
 // 3. LOGOUT
 if ($action === 'logout') {
     session_destroy();
-    echo json_encode(['status' => 'ok']);
+    echo json_encode(['status' => 'ok', 'success' => true]);
     exit;
 }
 
 // --- ZONA PROTEGIDA ---
 // Si no está logueado, cortamos acá.
 if (!isset($_SESSION['auth']) || $_SESSION['auth'] !== true) {
-    http_response_code(403);
+    http_response_code(401); // Changed to 401 for frontend handling
     echo json_encode(['status' => 'error', 'message' => 'No autorizado']);
     exit;
 }
@@ -48,7 +49,7 @@ function loadConfig() {
     if (file_exists($config_file)) {
         return json_decode(file_get_contents($config_file), true);
     }
-    return ['pdf_path' => '../Pdf/', 'active_csv' => 'nov25.csv'];
+    return ['ruta_pdf' => '../Pdf/', 'ruta_csv' => '../csv/Libro.csv', 'timeout_segundos' => 30];
 }
 
 function saveConfig($data) {
@@ -58,9 +59,18 @@ function saveConfig($data) {
 
 function readCSV($filename) {
     $rows = [];
-    $path = "../csv/" . $filename;
+    // Handle both full path or just filename
+    $path = $filename;
+    if (strpos($path, '/') === false && strpos($path, '\\') === false) {
+        $path = "../csv/" . $filename;
+    }
+    // Resolve absolute path if needed
+    if (!file_exists($path) && file_exists(__DIR__ . '/' . $path)) {
+        $path = __DIR__ . '/' . $path;
+    }
+    
     if (file_exists($path) && ($handle = fopen($path, "r")) !== FALSE) {
-        while (($data = fgetcsv($handle, 1000, ";")) !== FALSE) {
+        while (($data = fgetcsv($handle, 1000, ",")) !== FALSE) { // Changed delimiter to comma as per standard CSV
             $rows[] = $data;
         }
         fclose($handle);
@@ -69,9 +79,18 @@ function readCSV($filename) {
 }
 
 function writeCSV($filename, $data) {
-    if ($fp = fopen("../csv/" . $filename, 'w')) {
+    $path = $filename;
+    if (strpos($path, '/') === false && strpos($path, '\\') === false) {
+        $path = "../csv/" . $filename;
+    }
+    if (!file_exists(dirname($path))) {
+        // Try to use __DIR__ relative
+        $path = __DIR__ . '/../csv/' . $filename;
+    }
+
+    if ($fp = fopen($path, 'w')) {
         foreach ($data as $fields) {
-            fputcsv($fp, $fields, ";");
+            fputcsv($fp, $fields, ","); // Changed delimiter to comma
         }
         fclose($fp);
         return true;
@@ -82,30 +101,36 @@ function writeCSV($filename, $data) {
 // Cargar configuración actual
 $config = loadConfig();
 // Si viene un archivo específico en el POST (para editar uno que no es el activo), lo usamos
-$target_csv = $_POST['target_csv'] ?? $config['active_csv'];
+$target_csv = $_POST['target_csv'] ?? basename($config['ruta_csv']);
 
 switch ($action) {
     case 'get_config':
         // Escaneamos la carpeta CSV real en el servidor
         $csv_files = [];
-        if (is_dir('../csv/')) {
-            $files = scandir('../csv/');
+        $csv_dir = __DIR__ . '/../csv/';
+        if (is_dir($csv_dir)) {
+            $files = scandir($csv_dir);
             foreach($files as $f) {
                 if($f !== '.' && $f !== '..' && strpos($f, '.csv') !== false) {
                     $csv_files[] = $f;
                 }
             }
         }
-        echo json_encode(['config' => $config, 'csv_files' => $csv_files]);
+        // Ensure config has correct keys for frontend
+        if (!isset($config['ruta_pdf'])) $config['ruta_pdf'] = $config['pdf_path'] ?? '../Pdf/';
+        if (!isset($config['ruta_csv'])) $config['ruta_csv'] = $config['active_csv'] ?? '../csv/Libro.csv';
+        
+        echo json_encode(['config' => $config, 'csv_files' => $csv_files, 'ruta_pdf' => $config['ruta_pdf'], 'ruta_csv' => $config['ruta_csv'], 'timeout_segundos' => $config['timeout_segundos'] ?? 10]);
         break;
 
     case 'save_config':
         $new_config = [
-            'pdf_path' => rtrim($_POST['pdf_path'], '/') . '/',
-            'active_csv' => $_POST['active_csv']
+            'ruta_pdf' => $_POST['ruta_pdf'] ?? $_POST['pdf_path'],
+            'ruta_csv' => $_POST['ruta_csv'] ?? $_POST['active_csv'],
+            'timeout_segundos' => $_POST['timeout_segundos'] ?? 10
         ];
         saveConfig($new_config);
-        echo json_encode(['status' => 'ok']);
+        echo json_encode(['status' => 'ok', 'success' => true, 'msg' => 'Configuración guardada']);
         break;
 
     case 'get_data':
