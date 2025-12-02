@@ -51,13 +51,19 @@ function buscarEnLibro($codigo, $config) {
 
     fgetcsv($handle);
     
+    $codigo = mb_strtolower($codigo, 'UTF-8');
+
     while (($data = fgetcsv($handle, 1000, ',')) !== false) {
         if (count($data) >= 3) {
             $codArt = limpiarString($data[0]);
             $descripcion = limpiarString($data[1]);
             $ean = limpiarString($data[2]);
+            
+            $codArtNorm = mb_strtolower($codArt, 'UTF-8');
+            $eanNorm = mb_strtolower($ean, 'UTF-8');
+            $descNorm = mb_strtolower($descripcion, 'UTF-8');
 
-            if ($codArt === $codigo || $ean === $codigo) {
+            if ($codArtNorm === $codigo || $eanNorm === $codigo || strpos($descNorm, $codigo) !== false) {
                 fclose($handle);
                 return [
                     'encontrado' => true,
@@ -72,14 +78,35 @@ function buscarEnLibro($codigo, $config) {
 }
 
 function buscarPDF($producto, $config) {
-    $pdf_dir = $config['ruta_pdf'];
-    if (!is_dir($pdf_dir) && is_dir(__DIR__ . '/' . $pdf_dir)) {
-        $pdf_dir = __DIR__ . '/' . $pdf_dir;
+    $pdf_path_config = $config['ruta_pdf'];
+    
+    // Caso 1: URL HTTP/HTTPS
+    if (preg_match('/^https?:\/\//i', $pdf_path_config)) {
+        $pdf_path_config = rtrim($pdf_path_config, '/') . '/';
+        
+        $candidates = [];
+        if (!empty($producto['ean'])) $candidates[] = $producto['ean'];
+        if (!empty($producto['codigo'])) $candidates[] = $producto['codigo'];
+        
+        foreach ($candidates as $code) {
+            $url = $pdf_path_config . $code . '.pdf';
+            // Verificar si existe (HEAD request)
+            $headers = @get_headers($url);
+            if ($headers && strpos($headers[0], '200') !== false) {
+                return $url;
+            }
+        }
+        return null;
     }
-    $pdf_dir = rtrim($pdf_dir, '/\\') . DIRECTORY_SEPARATOR;
 
-    if (!is_dir($pdf_dir)) return null;
-    $pdfs = glob($pdf_dir . '*.{pdf,PDF}', GLOB_BRACE);
+    // Caso 2: Ruta Local / Red
+    if (!is_dir($pdf_path_config) && is_dir(__DIR__ . '/' . $pdf_path_config)) {
+        $pdf_path_config = __DIR__ . '/' . $pdf_path_config;
+    }
+    $pdf_path_config = rtrim($pdf_path_config, '/\\') . DIRECTORY_SEPARATOR;
+
+    if (!is_dir($pdf_path_config)) return null;
+    $pdfs = glob($pdf_path_config . '*.{pdf,PDF}', GLOB_BRACE);
     
     $busquedas = [];
     if (!empty($producto['ean'])) $busquedas[] = preg_replace('/[^a-z0-9]/', '', strtolower($producto['ean']));
@@ -105,11 +132,38 @@ $res = buscarEnLibro($codigo, $config);
 
 if ($res['encontrado']) {
     $pdf = buscarPDF($res['producto'], $config);
+    
+    // Si es URL, pdf ya es la URL. Si es local, es el nombre del archivo.
+    // El front espera 'pdf_url' y 'pdf_available'.
+    
+    $pdf_url = null;
+    $pdf_available = false;
+    
+    if ($pdf) {
+        $pdf_available = true;
+        if (preg_match('/^https?:\/\//i', $pdf)) {
+            $pdf_url = $pdf;
+        } else {
+            // Si es local, necesitamos construir la URL relativa para el navegador
+            // Asumimos que api/ver_pdf.php maneja esto o servimos directo
+            // El código original devolvía 'pdf' => nombre_archivo.
+            // Revisando app.js: btnPdf.onclick = () => openPdfViewer(data.pdf_url);
+            // Si el original devolvía 'pdf', entonces app.js estaba roto o yo leí mal.
+            // Voy a asumir que debemos devolver una URL válida.
+            // Si es local, probablemente sea 'api/ver_pdf.php?file=' . $pdf
+            // O si está en una carpeta pública...
+            // Dado que hay un 'api/ver_pdf.php' en el file list, probablemente sea ese.
+            $pdf_url = 'api/ver_pdf.php?file=' . urlencode($pdf);
+        }
+    }
+
     echo simpleJsonEncode([
         'error' => false,
         'encontrado' => true,
         'producto' => $res['producto'],
-        'pdf' => $pdf,
+        'pdf' => $pdf, // Mantener compatibilidad por si acaso
+        'pdf_available' => $pdf_available,
+        'pdf_url' => $pdf_url,
         'fuente' => $res['fuente']
     ]);
 } else {

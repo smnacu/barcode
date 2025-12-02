@@ -1,95 +1,85 @@
 <!DOCTYPE html>
 <html lang="es">
-  <head>
-    <meta charset="UTF-8" />
-    <meta
-      name="viewport"
-      content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"
-    />
-    <title>Scanner Daruma</title>
-    <link rel="manifest" href="manifest.json" />
-    <meta name="theme-color" content="#2563eb" />
-    <link rel="apple-touch-icon" href="icons/icon-192.png" />
-    <link rel="stylesheet" href="css/styles.css" />
-    <script src="js/libs/pdf.min.js"></script>
-    <script src="js/libs/pdf.worker.min.js"></script>
-  </head>
-  <body>
-    <div id="scanner-view-container" class="container">
-      <header>
-        <div>
-          <h1>Scanner Daruma</h1>
-          <p class="subtitle">Sistema de Planta</p>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>ITDelivery Scanner</title>
+    <link rel="manifest" href="manifest.json">
+    <link rel="stylesheet" href="css/styles.css">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+</head>
+<body>
+
+    <!-- Header -->
+    <header class="app-header">
+        <div style="display:flex; align-items:center; gap:10px;">
+            <img src="img/logo_bw.png" alt="Logo" class="logo">
+            <div id="status-bar" class="status-info">Sistema Online</div>
         </div>
-        <a href="settings.php" class="btn btn-sm btn-primary">⚙️</a>
-      </header>
-      <div class="main-content">
-        <section>
-          <div class="manual-input">
-            <input
-              type="text"
-              id="manualCodeInput"
-              placeholder="Codigo manual"
-              autocomplete="off"
-            />
-            <button id="manualCodeButton" class="btn btn-primary">
-              Buscar
-            </button>
-          </div>
-          <br />
-          <div id="scanner-region" class="scanner-region">
-            <div class="scanner-placeholder">Iniciando camara...</div>
-          </div>
-        </section>
-        <section class="history-section">
-          <div class="history-header">
-            <h3>Historial</h3>
-            <button id="limpiar-historial" class="btn btn-danger btn-sm">
-              Borrar
-            </button>
-          </div>
-          <div id="historial-container" class="history-list"></div>
-        </section>
-      </div>
-      <footer><p>Daruma Consulting SRL</p></footer>
+        <a href="admin.html" class="settings-link"><i class="fa fa-cog"></i></a>
+    </header>
+
+    <!-- Search Manual Area -->
+    <div class="search-container">
+        <div class="input-wrapper">
+            <i class="fa fa-search search-icon"></i>
+            <input type="text" id="manual-search-input" placeholder="Buscar por Código, Nombre o Art...">
+            <button id="btn-manual-search" class="btn btn-primary btn-sm">BUSCAR</button>
+        </div>
     </div>
 
-    <section id="result-view-container" class="result-section">
-      <header id="result-header" class="result-header">
-        <div id="ficha-info"></div>
-        <button id="scan-new-button" class="btn btn-success">Volver</button>
-      </header>
-      <div id="pdf-viewer-container" class="pdf-viewer">
-        <div id="pdf-controls" class="pdf-controls">
-          <button id="pdf-prev" class="btn btn-sm btn-primary">&lt;</button>
-          <span
-            ><span id="pdf-page-num"></span> / <span id="pdf-page-count"></span
-          ></span>
-          <button id="pdf-next" class="btn btn-sm btn-primary">&gt;</button>
+    <!-- Scanner Area -->
+    <main id="scanner-container" class="scanner-view">
+        <div id="reader"></div>
+        <p class="instruction">Apunte cámara o use el buscador manual</p>
+    </main>
+
+    <!-- Result Area (Oculto por defecto) -->
+    <main id="result-panel" class="result-view hidden">
+        <div class="card">
+            <div id="info-content"></div>
+            
+            <div class="actions">
+                <button id="btn-open-pdf" class="btn btn-primary btn-lg">
+                    <i class="fa fa-file-pdf"></i> Ver Documento
+                </button>
+                <button id="btn-reset" class="btn btn-secondary btn-lg">
+                    <i class="fa fa-redo"></i> Nueva Búsqueda
+                </button>
+            </div>
+            
+            <div id="pdf-container"></div>
         </div>
-        <div
-          style="
-            overflow: auto;
-            flex-grow: 1;
-            width: 100%;
-            display: flex;
-            justify-content: center;
-            background: #525659;
-          "
-        >
-          <canvas id="pdf-canvas"></canvas>
+    </main>
+
+    <!-- Historial -->
+    <section id="history-section" class="history-panel">
+        <h3><i class="fa fa-history"></i> Historial Reciente</h3>
+        <div id="history-list" class="history-list">
+            <!-- Se llena con JS -->
+            <p class="text-muted">No hay búsquedas recientes.</p>
         </div>
-      </div>
+        <button onclick="clearHistory()" class="btn-text-only">Borrar Historial</button>
     </section>
 
+    <!-- PDF Modal Overlay -->
+    <div id="pdf-modal" class="modal hidden">
+        <div class="modal-header">
+            <span>Visualizador Daruma</span>
+            <button id="btn-close-pdf" class="btn-close"><i class="fa fa-times"></i></button>
+        </div>
+        <div class="modal-body">
+            <iframe id="pdf-iframe" src="about:blank"></iframe>
+        </div>
+    </div>
+
+    <!-- Scripts -->
     <script src="js/libs/html5-qrcode.min.js"></script>
-    <script src="js/scanner.js"></script>
+    <script src="js/app.js"></script>
     <script>
-      if ("serviceWorker" in navigator) {
-        window.addEventListener("load", () =>
-          navigator.serviceWorker.register("js/sw.js")
-        );
-      }
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('js/sw.js');
+        }
     </script>
-  </body>
+</body>
 </html>

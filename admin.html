@@ -1,0 +1,345 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin - Daruma Scanner</title>
+    <link rel="stylesheet" href="css/styles.css">
+    <style>
+        /* Estilos específicos para Admin */
+        .admin-container { max-width: 1200px; margin: 0 auto; padding: 20px; }
+        .toolbar { background: var(--bg-card); padding: 15px; border-radius: 8px; margin-bottom: 20px; display: flex; gap: 10px; flex-wrap: wrap; align-items: flex-end; border: 1px solid #333; }
+        .data-table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 14px; color: var(--text-main); }
+        .data-table th, .data-table td { border: 1px solid #444; padding: 8px; text-align: left; }
+        .data-table th { background-color: #000; color: white; border-bottom: 2px solid var(--brand-red); }
+        .data-table tr:nth-child(even) { background-color: #1a1a1a; }
+        .data-table tr:hover { background-color: #252525; }
+        .editable { background: #333; cursor: pointer; color: #fff; }
+        .input-group { margin-bottom: 0; flex: 1; min-width: 200px;}
+        .input-group label { display: block; font-weight: bold; margin-bottom: 5px; font-size: 0.9em; color: var(--text-muted); }
+        .input-group input, .input-group select { width: 100%; padding: 10px; border: 1px solid #444; border-radius: 4px; background: var(--bg-input); color: var(--text-main); }
+        
+        /* Modal de Login */
+        #login-overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.9); z-index: 9999;
+            display: flex; justify-content: center; align-items: center;
+        }
+        .login-box {
+            background: var(--bg-card); padding: 30px; border-radius: 8px;
+            text-align: center; width: 90%; max-width: 400px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.5); border: 1px solid #333;
+        }
+        .login-box input { width: 100%; padding: 12px; margin: 15px 0; font-size: 16px; box-sizing: border-box; background: var(--bg-input); color: white; border: 1px solid #444; }
+        .hidden { display: none !important; }
+    </style>
+</head>
+<body>
+
+    <!-- Overlay de Login -->
+    <div id="login-overlay">
+        <div class="login-box">
+            <img src="img/logo_bw.png" alt="Logo" style="height: 50px; margin-bottom: 20px; filter: invert(1);">
+            <h2>Acceso Restringido</h2>
+            <p style="color: var(--text-muted)">Ingrese la clave de administrador</p>
+            <input type="password" id="admin-pass" placeholder="Contraseña">
+            <button onclick="doLogin()" class="btn btn-primary btn-lg" style="width:100%">Entrar</button>
+            <p id="login-error" style="color: var(--error); margin-top: 10px; display: none;">Clave incorrecta</p>
+            <a href="index.html" style="display:block; margin-top: 20px; color: var(--text-muted);">Volver al Scanner</a>
+        </div>
+    </div>
+
+    <!-- Contenido Admin (Oculto hasta loguear) -->
+    <div id="admin-content" class="hidden">
+        <header class="app-header">
+            <h1 style="color:white; margin:0; font-size: 1.2rem;">Panel ITDelivery</h1>
+            <div>
+                <button onclick="doLogout()" class="btn btn-secondary btn-sm">Salir</button>
+                <a href="index.html" class="btn btn-secondary btn-sm">Ir a Scanner</a>
+            </div>
+        </header>
+
+        <div class="admin-container">
+            
+            <!-- Configuración General -->
+            <section class="toolbar">
+                <div class="input-group">
+                    <label>Ruta PDFs (Server/Intranet)</label>
+                    <input type="text" id="config-pdf-path" placeholder="../Pdf/">
+                </div>
+                <div class="input-group">
+                    <label>Base de Datos Activa (Producción)</label>
+                    <select id="config-csv-active" onchange="highlightChange()"></select>
+                </div>
+                <div style="flex: 0 0 auto;">
+                    <button onclick="saveConfiguration()" class="btn btn-primary">Guardar Configuración</button>
+                </div>
+            </section>
+
+            <!-- Editor de CSV -->
+            <section class="toolbar" style="background: #252525;">
+                <div class="input-group">
+                    <label>Editar Archivo:</label>
+                    <select id="editor-csv-select" onchange="loadData()">
+                        <!-- Se llena con JS -->
+                    </select>
+                </div>
+                <div style="flex: 0 0 auto; display: flex; gap: 5px;">
+                    <button onclick="loadData()" class="btn btn-secondary"><i class="fa fa-sync"></i> Recargar</button>
+                    <button onclick="addRow()" class="btn btn-primary">+ Fila</button>
+                </div>
+            </section>
+
+            <!-- Subida de Archivos -->
+            <section class="toolbar">
+                 <div class="input-group">
+                    <label>Subir Nuevo CSV al Server</label>
+                    <input type="file" id="csv-upload" accept=".csv" style="background: var(--bg-input); color: white;">
+                </div>
+                <div style="flex: 0 0 auto;">
+                    <button onclick="uploadCSV()" class="btn btn-secondary">Subir</button>
+                </div>
+            </section>
+
+            <h3 id="table-title" style="color: var(--text-muted)">Datos del archivo: ...</h3>
+            <div style="overflow-x: auto; background: var(--bg-card); padding: 10px; border-radius: 8px; border: 1px solid #333;">
+                <table class="data-table" id="csv-table">
+                    <thead></thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API = 'api/admin.php';
+        let currentEditingFile = '';
+
+        document.addEventListener('DOMContentLoaded', () => {
+            checkAuth();
+            
+            // Permitir Enter en login
+            document.getElementById('admin-pass').addEventListener('keypress', function (e) {
+                if (e.key === 'Enter') doLogin();
+            });
+        });
+
+        // --- SEGURIDAD ---
+        function checkAuth() {
+            const fd = new FormData();
+            fd.append('action', 'check_auth');
+            fetch(API, { method: 'POST', body: fd })
+                .then(r => r.json())
+                .then(data => {
+                    if (data.auth) {
+                        showAdmin();
+                    }
+                });
+        }
+
+        function doLogin() {
+            const pass = document.getElementById('admin-pass').value;
+            const fd = new FormData();
+            fd.append('action', 'login');
+            fd.append('password', pass);
+
+            fetch(API, { method: 'POST', body: fd })
+                .then(r => r.json())
+                .then(data => {
+                    if (data.status === 'ok') {
+                        showAdmin();
+                    } else {
+                        document.getElementById('login-error').style.display = 'block';
+                    }
+                });
+        }
+
+        function doLogout() {
+            const fd = new FormData();
+            fd.append('action', 'logout');
+            fetch(API, { method: 'POST', body: fd })
+                .then(() => location.reload());
+        }
+
+        function showAdmin() {
+            document.getElementById('login-overlay').classList.add('hidden');
+            document.getElementById('admin-content').classList.remove('hidden');
+            loadConfig();
+        }
+
+        // --- LÓGICA DE ADMIN ---
+
+        function loadConfig() {
+            const formData = new FormData();
+            formData.append('action', 'get_config');
+            fetch(API, { method: 'POST', body: formData })
+                .then(r => r.json())
+                .then(data => {
+                    // Llenar inputs
+                    document.getElementById('config-pdf-path').value = data.config.pdf_path;
+                    
+                    // Llenar Selectores (El de Config Activa y el de Editor)
+                    const selActive = document.getElementById('config-csv-active');
+                    const selEditor = document.getElementById('editor-csv-select');
+                    
+                    selActive.innerHTML = '';
+                    selEditor.innerHTML = '';
+
+                    data.csv_files.forEach(f => {
+                        // Selector de Configuración
+                        const opt1 = document.createElement('option');
+                        opt1.value = f;
+                        opt1.innerText = f;
+                        if(f === data.config.active_csv) opt1.selected = true;
+                        selActive.appendChild(opt1);
+
+                        // Selector de Editor (por defecto selecciona el activo también)
+                        const opt2 = document.createElement('option');
+                        opt2.value = f;
+                        opt2.innerText = f;
+                        if(f === data.config.active_csv && currentEditingFile === '') opt2.selected = true;
+                        selEditor.appendChild(opt2);
+                    });
+
+                    // Cargar datos en la tabla (del archivo seleccionado en el editor)
+                    if(currentEditingFile === '') {
+                        currentEditingFile = data.config.active_csv;
+                    }
+                    loadData(); 
+                });
+        }
+
+        function saveConfiguration() {
+            const formData = new FormData();
+            formData.append('action', 'save_config');
+            formData.append('pdf_path', document.getElementById('config-pdf-path').value);
+            formData.append('active_csv', document.getElementById('config-csv-active').value);
+            
+            fetch(API, { method: 'POST', body: formData })
+                .then(r => r.json())
+                .then(d => {
+                    if(d.status === 'ok') {
+                        alert('Configuración guardada correctamente.');
+                    }
+                });
+        }
+
+        function loadData() {
+            // Actualizar archivo actual basado en el selector del editor
+            currentEditingFile = document.getElementById('editor-csv-select').value;
+            document.getElementById('table-title').innerText = 'Editando: ' + currentEditingFile;
+
+            const formData = new FormData();
+            formData.append('action', 'get_data');
+            formData.append('target_csv', currentEditingFile);
+            
+            fetch(API, { method: 'POST', body: formData })
+                .then(r => r.json())
+                .then(res => {
+                    renderTable(res.data);
+                });
+        }
+
+        function highlightChange() {
+            document.getElementById('config-csv-active').style.border = "2px solid var(--warning)";
+        }
+
+        // --- MANEJO DE TABLA (Igual que antes pero apunta a currentEditingFile) ---
+        function renderTable(rows) {
+            const table = document.getElementById('csv-table');
+            table.innerHTML = '';
+            
+            if(!rows || rows.length === 0) {
+                table.innerHTML = '<tbody><tr><td>Archivo vacío o no encontrado</td></tr></tbody>';
+                return;
+            }
+
+            const thead = document.createElement('thead');
+            const trHead = document.createElement('tr');
+            rows[0].forEach((_, i) => {
+                const th = document.createElement('th');
+                th.innerText = i === 0 ? 'CÓDIGO (Key)' : `Columna ${i}`;
+                trHead.appendChild(th);
+            });
+            trHead.appendChild(document.createElement('th')).innerText = 'Acciones';
+            thead.appendChild(trHead);
+            table.appendChild(thead);
+
+            const tbody = document.createElement('tbody');
+            rows.forEach((row, rowIndex) => {
+                const tr = document.createElement('tr');
+                row.forEach((cell, cellIndex) => {
+                    const td = document.createElement('td');
+                    td.innerText = cell;
+                    td.contentEditable = true;
+                    td.onblur = () => saveCell(rowIndex, cellIndex, td.innerText, row);
+                    tr.appendChild(td);
+                });
+                
+                const tdAct = document.createElement('td');
+                const btnDel = document.createElement('button');
+                btnDel.innerText = 'X';
+                btnDel.style.background = '#c0392b'; btnDel.style.color='white'; btnDel.style.border='none';
+                btnDel.onclick = () => deleteRow(rowIndex);
+                tdAct.appendChild(btnDel);
+                tr.appendChild(tdAct);
+                
+                tbody.appendChild(tr);
+            });
+            table.appendChild(tbody);
+        }
+
+        function saveCell(rowIndex, colIndex, value, originalRow) {
+            originalRow[colIndex] = value;
+            const fd = new FormData();
+            fd.append('action', 'update_row');
+            fd.append('target_csv', currentEditingFile);
+            fd.append('index', rowIndex);
+            originalRow.forEach((val, i) => fd.append(`row_data[${i}]`, val));
+            fetch(API, { method: 'POST', body: fd });
+        }
+
+        function addRow() {
+            const table = document.getElementById('csv-table');
+            const cols = table.rows.length > 0 ? table.rows[0].cells.length - 1 : 1;
+            const emptyRow = new Array(cols).fill("...");
+            
+            const fd = new FormData();
+            fd.append('action', 'add_row');
+            fd.append('target_csv', currentEditingFile);
+            emptyRow.forEach((val, i) => fd.append(`row_data[${i}]`, val));
+            
+            fetch(API, { method: 'POST', body: fd }).then(() => loadData());
+        }
+
+        function deleteRow(index) {
+            if(!confirm('¿Borrar fila?')) return;
+            const fd = new FormData();
+            fd.append('action', 'delete_row');
+            fd.append('target_csv', currentEditingFile);
+            fd.append('index', index);
+            fetch(API, { method: 'POST', body: fd }).then(() => loadData());
+        }
+
+        function uploadCSV() {
+            const fileInput = document.getElementById('csv-upload');
+            if(fileInput.files.length === 0) return;
+            
+            const fd = new FormData();
+            fd.append('action', 'upload_csv');
+            fd.append('file', fileInput.files[0]);
+            
+            fetch(API, { method: 'POST', body: fd })
+                .then(r => r.json())
+                .then(d => {
+                    if(d.status === 'ok') {
+                        alert('Archivo subido');
+                        loadConfig(); 
+                    } else {
+                        alert('Error: ' + d.message);
+                    }
+                });
+        }
+    </script>
+</body>
+</html>

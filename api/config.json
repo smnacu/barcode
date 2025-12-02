@@ -1,5 +1,4 @@
 {
-    "ruta_csv": "../csv/Libro.csv",
-    "ruta_pdf": "../Pdf/",
-    "timeout_segundos": 30
+    "pdf_path": "\"http:\\\\192.168.170.160\\PDF-EXPGRIFERIA\",
+    "active_csv": "nov25.csv"
 }
