@@ -177,6 +177,9 @@ async function requestCameraPermission() {
 
         if (startScreen) startScreen.classList.add('hidden');
 
+        // Pequeño delay para asegurar que la cámara se liberó completamente
+        await new Promise(r => setTimeout(r, 500));
+
         // Arrancar scanner (Html5Qrcode solicitará de nuevo acceso si fuese necesario)
         await startScanner();
 
@@ -221,6 +224,9 @@ async function startScanner() {
         startScreen.classList.add('hidden');
         scannerContainer.classList.remove('hidden');
 
+        // Asegurar que el elemento está limpio
+        document.getElementById('reader').innerHTML = '';
+
         html5QrcodeScanner = new Html5Qrcode("reader");
 
         const config = {
@@ -260,7 +266,7 @@ async function startScanner() {
             await tryStart(constraints);
             console.log('✅ Scanner iniciado exitosamente');
         } catch (firstErr) {
-            console.warn('⚠️ Intento 1 falló. Detalle:', firstErr && firstErr.message);
+            console.warn('⚠️ Intento 1 falló. Detalle:', firstErr);
             // Intentar fallback simple { video: true } una sola vez
             triedSimple = true;
             try {
@@ -279,21 +285,28 @@ async function startScanner() {
 
     } catch (err) {
         console.error("❌ Error iniciando cámara:", err);
-        // scannerContainer.classList.add('hidden');
-        // startScreen.classList.remove('hidden');
+        scannerContainer.classList.add('hidden');
+        startScreen.classList.remove('hidden');
 
         // Log detallado para debugging
-        const errDetail = {
-            name: err && err.name || 'unknown',
-            message: err && err.message || 'no message',
-            code: err && err.code || 'no code',
-            toString: err && err.toString && err.toString()
-        };
+        let errDetail = {};
+        if (typeof err === 'object') {
+            errDetail = {
+                name: err.name || 'unknown',
+                message: err.message || 'no message',
+                code: err.code || 'no code',
+                toString: err.toString ? err.toString() : String(err)
+            };
+        } else {
+            errDetail = { message: String(err) };
+        }
         console.error('📋 Detalle completo del error:', errDetail);
 
-        let msg = 'Error desconocido.';
+        let msg = `Error desconocido: ${JSON.stringify(errDetail)}`;
 
-        if (err && (err.name === 'NotAllowedError' || (err.message && err.message.toLowerCase().includes('permission')))) {
+        if (typeof err === 'string') {
+            msg = `Error: ${err}`;
+        } else if (err && (err.name === 'NotAllowedError' || (err.message && err.message.toLowerCase().includes('permission')))) {
             msg = '🔐 Permiso denegado. Habilita cámara en ajustes del navegador.';
         } else if (err && (err.name === 'NotFoundError' || (err.message && err.message.toLowerCase().includes('device')))) {
             msg = '📷 No se encontró cámara en este dispositivo.';
@@ -305,8 +318,6 @@ async function startScanner() {
             msg = '🔒 Se requiere HTTPS o localhost para cámara.';
         } else if (err && err.message) {
             msg = `❌ Error: ${err.message}`;
-        } else if (errDetail.name && errDetail.name !== 'unknown') {
-            msg = `❌ Error (${errDetail.name})`;
         }
 
         errorMsg.innerText = msg;
