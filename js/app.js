@@ -67,7 +67,7 @@ function ensureAndroidCompatibility() {
     // Fix viewport para tablets
     const viewport = document.querySelector('meta[name="viewport"]');
     if (viewport) {
-        viewport.setAttribute('content', 
+        viewport.setAttribute('content',
             'width=device-width, initial-scale=1.0, maximum-scale=1.0, ' +
             'user-scalable=no, viewport-fit=cover'
         );
@@ -94,30 +94,30 @@ function ensureAndroidCompatibility() {
 
 document.addEventListener('DOMContentLoaded', () => {
     console.log('🚀 Iniciando aplicación...');
-    
+
     // Asegurar compatibilidad
     ensureAndroidCompatibility();
-    
+
     // Registrar Service Worker para PWA offline
     if ('serviceWorker' in navigator) {
         navigator.serviceWorker.register('./sw.js')
             .then(reg => console.log('✅ Service Worker registrado:', reg.scope))
             .catch(err => console.warn('⚠️ Error registrando SW:', err.message));
     }
-    
+
     // Detectar si se ejecuta como PWA
     if (window.navigator.standalone === true) {
         console.log('📱 Ejecutándose como PWA instalada');
     }
-    
+
     // Cargar historial guardado
     const stored = loadHistoryFromStorage();
     const historyList = document.getElementById('history-list');
-    
+
     stored.forEach(item => {
         renderHistoryItem(historyList, item.ean, item.desc, item.url, item.success);
     });
-    
+
     // Intentar pedir permiso y arrancar scanner automáticamente
     requestCameraPermission();
 });
@@ -206,12 +206,12 @@ async function startScanner() {
     const statusBadge = document.getElementById('scan-status');
 
     errorMsg.classList.add('hidden');
-    
+
     // Si ya existe instancia, matar para reiniciar (útil para rotar cámara)
     if (html5QrcodeScanner) {
-        try { 
-            await html5QrcodeScanner.stop(); 
-            html5QrcodeScanner.clear(); 
+        try {
+            await html5QrcodeScanner.stop();
+            html5QrcodeScanner.clear();
         } catch (e) {
             console.warn('⚠️ Error limpiando scanner anterior:', e.message);
         }
@@ -223,7 +223,7 @@ async function startScanner() {
 
         html5QrcodeScanner = new Html5Qrcode("reader");
 
-        const config = { 
+        const config = {
             fps: 15,
             qrbox: { width: 250, height: 150 },
             aspectRatio: 1.0,
@@ -279,9 +279,9 @@ async function startScanner() {
 
     } catch (err) {
         console.error("❌ Error iniciando cámara:", err);
-        scannerContainer.classList.add('hidden');
-        startScreen.classList.remove('hidden');
-        
+        // scannerContainer.classList.add('hidden');
+        // startScreen.classList.remove('hidden');
+
         // Log detallado para debugging
         const errDetail = {
             name: err && err.name || 'unknown',
@@ -290,9 +290,9 @@ async function startScanner() {
             toString: err && err.toString && err.toString()
         };
         console.error('📋 Detalle completo del error:', errDetail);
-        
+
         let msg = 'Error desconocido.';
-        
+
         if (err && (err.name === 'NotAllowedError' || (err.message && err.message.toLowerCase().includes('permission')))) {
             msg = '🔐 Permiso denegado. Habilita cámara en ajustes del navegador.';
         } else if (err && (err.name === 'NotFoundError' || (err.message && err.message.toLowerCase().includes('device')))) {
@@ -308,10 +308,10 @@ async function startScanner() {
         } else if (errDetail.name && errDetail.name !== 'unknown') {
             msg = `❌ Error (${errDetail.name})`;
         }
-        
+
         errorMsg.innerText = msg;
         errorMsg.classList.remove('hidden');
-        
+
         // Actualizar scan-log con error para visibilidad rápida
         updateScanLog(msg);
     }
@@ -343,7 +343,7 @@ async function onScanSuccess(decodedText, decodedResult) {
 
     // Feedback inmediato
     beep.play().catch(e => console.log('🔇 Audio bloqueado en este dispositivo'));
-    
+
     // Cambiar estado visualmente
     const statusBadge = document.getElementById('scan-status');
     statusBadge.innerHTML = '<i class="ph-bold ph-spinner animate-spin"></i> PROCESANDO';
@@ -351,11 +351,11 @@ async function onScanSuccess(decodedText, decodedResult) {
 
     try {
         const response = await fetch(`api/buscar.php?ean=${encodeURIComponent(decodedText)}`);
-        
+
         if (!response.ok) {
             throw new Error(`HTTP ${response.status}: ${response.statusText}`);
         }
-        
+
         const data = await response.json();
 
         if (data.found) {
@@ -368,7 +368,7 @@ async function onScanSuccess(decodedText, decodedResult) {
         addToHistory(decodedText, `Error de Red: ${error.message}`, null, false);
     } finally {
         // Pausa para no escanear lo mismo múltiples veces
-        setTimeout(() => { 
+        setTimeout(() => {
             isProcessing = false;
             // Restaurar estado
             const statusBadge = document.getElementById('scan-status');
@@ -385,7 +385,7 @@ function onScanFailure(error) {
 function handleFound(data) {
     // Construir la URL completa del PDF
     const fullUrl = data.pdf_base_url + data.pdf_name + '.pdf';
-    
+
     // Agregar al historial (ÉXITO)
     addToHistory(data.ean, data.descripcion, fullUrl, true);
 
@@ -429,11 +429,11 @@ function updateScanLog(message) {
 
 function renderHistoryItem(list, ean, desc, url, success) {
     const item = document.createElement('div');
-    
+
     item.className = "history-item bg-gray-800 rounded-lg p-3 flex justify-between items-center border border-gray-700 shadow-sm relative overflow-hidden group";
-    
+
     const colorClass = success ? "bg-green-500" : "bg-red-500";
-    
+
     let actionButton = '';
     if (success && url) {
         actionButton = `
@@ -464,10 +464,10 @@ function renderHistoryItem(list, ean, desc, url, success) {
 
 function addToHistory(ean, desc, url, success) {
     const list = document.getElementById('history-list');
-    
+
     // Renderizar en UI
     renderHistoryItem(list, ean, desc, url, success);
-    
+
     // Guardar en localStorage
     const newItem = {
         ean,
@@ -476,11 +476,11 @@ function addToHistory(ean, desc, url, success) {
         success,
         timestamp: new Date().toISOString()
     };
-    
+
     const existing = loadHistoryFromStorage();
     const updated = [newItem, ...existing];
     saveHistoryToStorage(updated);
-    
+
     // Limpiar UI (máx 30 items)
     while (list.children.length > MAX_HISTORY_ITEMS) {
         list.removeChild(list.lastChild);
