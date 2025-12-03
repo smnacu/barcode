@@ -5,6 +5,7 @@
 let html5QrcodeScanner = null;
 let isProcessing = false;
 let currentFacingMode = "user"; // Arranca con la frontal (Selfie)
+let isCameraStarting = false;
 
 // Control de deduplicación de escaneos
 let lastScannedEAN = null;
@@ -203,128 +204,136 @@ async function requestCameraPermission() {
 }
 
 async function startScanner() {
-    const startScreen = document.getElementById('start-screen');
-    const scannerContainer = document.getElementById('scanner-container');
-    const errorMsg = document.getElementById('error-msg');
-    const statusBadge = document.getElementById('scan-status');
-
-    errorMsg.classList.add('hidden');
-
-    // Si ya existe instancia, matar para reiniciar (útil para rotar cámara)
-    if (html5QrcodeScanner) {
-        try {
-            await html5QrcodeScanner.stop();
-            html5QrcodeScanner.clear();
-        } catch (e) {
-            console.warn('⚠️ Error limpiando scanner anterior:', e.message);
-        }
-    }
+    if (isCameraStarting) return;
+    isCameraStarting = true;
 
     try {
-        startScreen.classList.add('hidden');
-        scannerContainer.classList.remove('hidden');
+        const startScreen = document.getElementById('start-screen');
+        const scannerContainer = document.getElementById('scanner-container');
+        const errorMsg = document.getElementById('error-msg');
+        const statusBadge = document.getElementById('scan-status');
 
-        // Asegurar que el elemento está limpio
-        document.getElementById('reader').innerHTML = '';
+        errorMsg.classList.add('hidden');
 
-        html5QrcodeScanner = new Html5Qrcode("reader");
-
-        const config = {
-            fps: 15,
-            qrbox: { width: 250, height: 150 },
-            aspectRatio: 1.0,
-            disableFlip: false,
-            formatsToSupport: [
-                Html5QrcodeSupportedFormats.QR_CODE,
-                Html5QrcodeSupportedFormats.CODE_128,
-                Html5QrcodeSupportedFormats.EAN_13,
-                Html5QrcodeSupportedFormats.EAN_8
-            ]
-        };
-
-        let triedSimple = false;
-
-        async function tryStart(constraints) {
-            const startPromise = html5QrcodeScanner.start(
-                constraints,
-                config,
-                onScanSuccess,
-                onScanFailure
-            );
-
-            const timeoutPromise = new Promise((_, reject) =>
-                setTimeout(() => reject(new Error('Timeout iniciando cámara (10s)')), 10000)
-            );
-
-            return Promise.race([startPromise, timeoutPromise]);
-        }
-
-        // Primero intentar con facingMode ideal
-        try {
-            console.log('🎬 Intento 1: Constraints con facingMode ideal:', currentFacingMode);
-            const constraints = { facingMode: { ideal: currentFacingMode } };
-            await tryStart(constraints);
-            console.log('✅ Scanner iniciado exitosamente');
-        } catch (firstErr) {
-            console.warn('⚠️ Intento 1 falló. Detalle:', firstErr);
-            // Intentar fallback simple { video: true } una sola vez
-            triedSimple = true;
+        // Si ya existe instancia, matar para reiniciar (útil para rotar cámara)
+        if (html5QrcodeScanner) {
             try {
-                console.log('🎬 Intento 2: Fallback con { video: true }');
-                await tryStart({ video: true });
-                console.log('✅ Scanner iniciado en fallback');
-            } catch (secondErr) {
-                // Re-lanzar el error original para manejo final
-                console.error('❌ Intento 2 también falló');
-                throw secondErr || firstErr;
+                await html5QrcodeScanner.stop();
+                html5QrcodeScanner.clear();
+            } catch (e) {
+                console.warn('⚠️ Error limpiando scanner anterior:', e.message);
             }
+            html5QrcodeScanner = null;
         }
 
-        statusBadge.innerHTML = '<span class="w-2 h-2 bg-black rounded-full animate-pulse"></span> ACTIVO';
-        statusBadge.className = "bg-green-500/90 text-black text-xs font-bold px-3 py-1.5 rounded-full uppercase tracking-wider shadow-lg flex items-center gap-1";
+        try {
+            startScreen.classList.add('hidden');
+            scannerContainer.classList.remove('hidden');
 
-    } catch (err) {
-        console.error("❌ Error iniciando cámara:", err);
-        scannerContainer.classList.add('hidden');
-        startScreen.classList.remove('hidden');
+            // Asegurar que el elemento está limpio
+            document.getElementById('reader').innerHTML = '';
 
-        // Log detallado para debugging
-        let errDetail = {};
-        if (typeof err === 'object') {
-            errDetail = {
-                name: err.name || 'unknown',
-                message: err.message || 'no message',
-                code: err.code || 'no code',
-                toString: err.toString ? err.toString() : String(err)
+            html5QrcodeScanner = new Html5Qrcode("reader");
+
+            const config = {
+                fps: 15,
+                qrbox: { width: 250, height: 150 },
+                aspectRatio: 1.0,
+                disableFlip: false,
+                formatsToSupport: [
+                    Html5QrcodeSupportedFormats.QR_CODE,
+                    Html5QrcodeSupportedFormats.CODE_128,
+                    Html5QrcodeSupportedFormats.EAN_13,
+                    Html5QrcodeSupportedFormats.EAN_8
+                ]
             };
-        } else {
-            errDetail = { message: String(err) };
+
+            let triedSimple = false;
+
+            async function tryStart(constraints) {
+                const startPromise = html5QrcodeScanner.start(
+                    constraints,
+                    config,
+                    onScanSuccess,
+                    onScanFailure
+                );
+
+                const timeoutPromise = new Promise((_, reject) =>
+                    setTimeout(() => reject(new Error('Timeout iniciando cámara (10s)')), 10000)
+                );
+
+                return Promise.race([startPromise, timeoutPromise]);
+            }
+
+            // Primero intentar con facingMode ideal
+            try {
+                console.log('🎬 Intento 1: Constraints con facingMode ideal:', currentFacingMode);
+                const constraints = { facingMode: { ideal: currentFacingMode } };
+                await tryStart(constraints);
+                console.log('✅ Scanner iniciado exitosamente');
+            } catch (firstErr) {
+                console.warn('⚠️ Intento 1 falló. Detalle:', firstErr);
+                // Intentar fallback simple { video: true } una sola vez
+                triedSimple = true;
+                try {
+                    console.log('🎬 Intento 2: Fallback con { video: true }');
+                    await tryStart({ video: true });
+                    console.log('✅ Scanner iniciado en fallback');
+                } catch (secondErr) {
+                    // Re-lanzar el error original para manejo final
+                    console.error('❌ Intento 2 también falló');
+                    throw secondErr || firstErr;
+                }
+            }
+
+            statusBadge.innerHTML = '<span class="w-2 h-2 bg-black rounded-full animate-pulse"></span> ACTIVO';
+            statusBadge.className = "bg-green-500/90 text-black text-xs font-bold px-3 py-1.5 rounded-full uppercase tracking-wider shadow-lg flex items-center gap-1";
+
+        } catch (err) {
+            console.error("❌ Error iniciando cámara:", err);
+            // scannerContainer.classList.add('hidden');
+            // startScreen.classList.remove('hidden');
+
+            // Log detallado para debugging
+            let errDetail = {};
+            if (typeof err === 'object') {
+                errDetail = {
+                    name: err.name || 'unknown',
+                    message: err.message || 'no message',
+                    code: err.code || 'no code',
+                    toString: err.toString ? err.toString() : String(err)
+                };
+            } else {
+                errDetail = { message: String(err) };
+            }
+            console.error('📋 Detalle completo del error:', errDetail);
+
+            let msg = `Error desconocido: ${JSON.stringify(errDetail)}`;
+
+            if (typeof err === 'string') {
+                msg = `Error: ${err}`;
+            } else if (err && (err.name === 'NotAllowedError' || (err.message && err.message.toLowerCase().includes('permission')))) {
+                msg = '🔐 Permiso denegado. Habilita cámara en ajustes del navegador.';
+            } else if (err && (err.name === 'NotFoundError' || (err.message && err.message.toLowerCase().includes('device')))) {
+                msg = '📷 No se encontró cámara en este dispositivo.';
+            } else if (err && err.name === 'NotReadableError') {
+                msg = '⚠️ Cámara en uso. Cierra otras apps que la usen.';
+            } else if (err && err.message && err.message.toLowerCase().includes('timeout')) {
+                msg = '⏱️ Timeout: cámara tardó demasiado en iniciar.';
+            } else if (err && err.message && err.message.toLowerCase().includes('https')) {
+                msg = '🔒 Se requiere HTTPS o localhost para cámara.';
+            } else if (err && err.message) {
+                msg = `❌ Error: ${err.message}`;
+            }
+
+            errorMsg.innerText = msg;
+            errorMsg.classList.remove('hidden');
+
+            // Actualizar scan-log con error para visibilidad rápida
+            updateScanLog(msg);
         }
-        console.error('📋 Detalle completo del error:', errDetail);
-
-        let msg = `Error desconocido: ${JSON.stringify(errDetail)}`;
-
-        if (typeof err === 'string') {
-            msg = `Error: ${err}`;
-        } else if (err && (err.name === 'NotAllowedError' || (err.message && err.message.toLowerCase().includes('permission')))) {
-            msg = '🔐 Permiso denegado. Habilita cámara en ajustes del navegador.';
-        } else if (err && (err.name === 'NotFoundError' || (err.message && err.message.toLowerCase().includes('device')))) {
-            msg = '📷 No se encontró cámara en este dispositivo.';
-        } else if (err && err.name === 'NotReadableError') {
-            msg = '⚠️ Cámara en uso. Cierra otras apps que la usen.';
-        } else if (err && err.message && err.message.toLowerCase().includes('timeout')) {
-            msg = '⏱️ Timeout: cámara tardó demasiado en iniciar.';
-        } else if (err && err.message && err.message.toLowerCase().includes('https')) {
-            msg = '🔒 Se requiere HTTPS o localhost para cámara.';
-        } else if (err && err.message) {
-            msg = `❌ Error: ${err.message}`;
-        }
-
-        errorMsg.innerText = msg;
-        errorMsg.classList.remove('hidden');
-
-        // Actualizar scan-log con error para visibilidad rápida
-        updateScanLog(msg);
+    } finally {
+        isCameraStarting = false;
     }
 }
 
