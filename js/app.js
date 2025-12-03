@@ -230,10 +230,19 @@ async function startScanner() {
             startScreen.classList.add('hidden');
             scannerContainer.classList.remove('hidden');
 
-            // Asegurar que el elemento está limpio
-            document.getElementById('reader').innerHTML = '';
+            // Asegurar que el elemento está limpio y usar ID único para evitar bloqueos
+            // Buscamos por clase porque el ID cambia dinámicamente
+            const readerContainer = document.querySelector('.scanner-video-container') || document.getElementById('reader');
 
-            html5QrcodeScanner = new Html5Qrcode("reader");
+            if (readerContainer) {
+                readerContainer.innerHTML = '';
+                const newId = `reader-${Date.now()}`;
+                readerContainer.id = newId;
+
+                html5QrcodeScanner = new Html5Qrcode(newId);
+            } else {
+                throw new Error("No se encontró el contenedor del scanner");
+            }
 
             const config = {
                 fps: 15,

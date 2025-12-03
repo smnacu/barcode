@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="es">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
@@ -10,26 +11,75 @@
     <!-- Iconos Phosphor -->
     <script src="https://unpkg.com/@phosphor-icons/web"></script>
     <style>
-        body { font-family: 'Inter', sans-serif; -webkit-tap-highlight-color: transparent; }
+        body {
+            font-family: 'Inter', sans-serif;
+            -webkit-tap-highlight-color: transparent;
+        }
+
         /* Estética tipo admin: header oscuro profesional */
         .app-header {
-            display:flex; align-items:center; justify-content:space-between; gap:12px;
-            padding:12px 16px; background:linear-gradient(180deg, rgba(255,255,255,0.02), transparent);
-            border-bottom:1px solid #131316; z-index:30;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            padding: 12px 16px;
+            background: linear-gradient(180deg, rgba(255, 255, 255, 0.02), transparent);
+            border-bottom: 1px solid #131316;
+            z-index: 30;
         }
-        .header-left { display:flex; align-items:center; gap:12px }
-        .header-title { font-weight:700; font-size:1rem; color:#e6eef6 }
-        #scan-log { background:#071018; color:#9aa4b2; padding:6px 10px; border-radius:8px; border:1px solid #12202a; font-size:12px; min-width:180px; max-width:420px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap }
+
+        .header-left {
+            display: flex;
+            align-items: center;
+            gap: 12px
+        }
+
+        .header-title {
+            font-weight: 700;
+            font-size: 1rem;
+            color: #e6eef6
+        }
+
+        #scan-log {
+            background: #071018;
+            color: #9aa4b2;
+            padding: 6px 10px;
+            border-radius: 8px;
+            border: 1px solid #12202a;
+            font-size: 12px;
+            min-width: 180px;
+            max-width: 420px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap
+        }
+
         /* Animación suave para items del historial */
-        .history-item { animation: slideIn 0.3s ease-out; }
-        @keyframes slideIn {
-            from { opacity: 0; transform: translateY(-10px); }
-            to { opacity: 1; transform: translateY(0); }
+        .history-item {
+            animation: slideIn 0.3s ease-out;
         }
+
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateY(-10px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
         /* Ajuste para que el video ocupe todo el contenedor sin bordes raros */
-        #reader video { object-fit: cover; width: 100% !important; height: 100% !important; }
+        .scanner-video-container video {
+            object-fit: cover;
+            width: 100% !important;
+            height: 100% !important;
+        }
     </style>
 </head>
+
 <body class="bg-gray-950 text-gray-100 h-screen flex flex-col overflow-hidden">
 
     <!-- Header Fijo (estética oscura, log al lado del logo) -->
@@ -45,7 +95,8 @@
             <div id="scan-log">Última acción: listo</div>
         </div>
         <div style="display:flex; align-items:center; gap:8px">
-            <a href="admin.html" class="bg-gray-800 hover:bg-gray-700 text-gray-400 hover:text-white p-2 rounded-lg transition-colors">
+            <a href="admin.html"
+                class="bg-gray-800 hover:bg-gray-700 text-gray-400 hover:text-white p-2 rounded-lg transition-colors">
                 <i class="ph-fill ph-gear text-xl"></i>
             </a>
         </div>
@@ -53,15 +104,18 @@
 
     <!-- Área Principal -->
     <main class="flex-grow flex flex-col relative w-full max-w-lg mx-auto bg-black">
-        
+
         <!-- PANTALLA DE PERMISOS (Solo si falla el auto-start) -->
-        <div id="start-screen" class="hidden absolute inset-0 z-50 bg-gray-900 flex flex-col items-center justify-center p-6 text-center">
+        <div id="start-screen"
+            class="hidden absolute inset-0 z-50 bg-gray-900 flex flex-col items-center justify-center p-6 text-center">
             <div class="bg-gray-800 p-6 rounded-full mb-6">
                 <i class="ph-duotone ph-camera-slash text-6xl text-gray-500"></i>
             </div>
             <h2 class="text-xl font-bold mb-2">Cámara Desactivada</h2>
-            <p class="text-gray-400 text-sm mb-8 px-4">Necesitamos acceso a tu cámara para escanear los códigos de barras.</p>
-            <button onclick="requestCameraPermission()" class="w-full max-w-xs bg-red-600 hover:bg-red-700 text-white font-bold py-4 rounded-xl shadow-lg transition-transform active:scale-95 flex items-center justify-center gap-2">
+            <p class="text-gray-400 text-sm mb-8 px-4">Necesitamos acceso a tu cámara para escanear los códigos de
+                barras.</p>
+            <button onclick="requestCameraPermission()"
+                class="w-full max-w-xs bg-red-600 hover:bg-red-700 text-white font-bold py-4 rounded-xl shadow-lg transition-transform active:scale-95 flex items-center justify-center gap-2">
                 ACTIVAR CÁMARA
             </button>
             <p id="error-msg" class="text-red-400 text-xs mt-6 font-mono hidden"></p>
@@ -70,27 +124,32 @@
         <!-- CONTENEDOR CÁMARA -->
         <div id="scanner-container" class="relative flex-grow overflow-hidden bg-black">
             <!-- El video se inyecta acá -->
-            <div id="reader" class="w-full h-full"></div>
-            
+            <div id="reader" class="w-full h-full scanner-video-container"></div>
+
             <!-- Guía Visual (Cuadrado Rojo) -->
             <div class="absolute inset-0 pointer-events-none z-10 flex items-center justify-center">
-                <div class="w-[80%] aspect-[3/2] border-2 border-red-500/80 rounded-lg shadow-[0_0_0_9999px_rgba(0,0,0,0.5)] relative">
+                <div
+                    class="w-[80%] aspect-[3/2] border-2 border-red-500/80 rounded-lg shadow-[0_0_0_9999px_rgba(0,0,0,0.5)] relative">
                     <!-- Esquinas decorativas -->
                     <div class="absolute top-0 left-0 w-4 h-4 border-t-4 border-l-4 border-red-500 -mt-1 -ml-1"></div>
                     <div class="absolute top-0 right-0 w-4 h-4 border-t-4 border-r-4 border-red-500 -mt-1 -mr-1"></div>
-                    <div class="absolute bottom-0 left-0 w-4 h-4 border-b-4 border-l-4 border-red-500 -mb-1 -ml-1"></div>
-                    <div class="absolute bottom-0 right-0 w-4 h-4 border-b-4 border-r-4 border-red-500 -mb-1 -mr-1"></div>
+                    <div class="absolute bottom-0 left-0 w-4 h-4 border-b-4 border-l-4 border-red-500 -mb-1 -ml-1">
+                    </div>
+                    <div class="absolute bottom-0 right-0 w-4 h-4 border-b-4 border-r-4 border-red-500 -mb-1 -mr-1">
+                    </div>
                 </div>
             </div>
 
             <!-- Botón Rotar (Flotante Abajo Izq) -->
-            <button onclick="switchCamera()" class="absolute bottom-6 left-6 z-20 bg-gray-900/80 backdrop-blur border border-gray-600 text-white p-3 rounded-full shadow-lg active:scale-90 transition-all">
+            <button onclick="switchCamera()"
+                class="absolute bottom-6 left-6 z-20 bg-gray-900/80 backdrop-blur border border-gray-600 text-white p-3 rounded-full shadow-lg active:scale-90 transition-all">
                 <i class="ph-bold ph-arrows-clockwise text-2xl"></i>
             </button>
 
             <!-- Status (Flotante Abajo Der) -->
             <div class="absolute bottom-6 right-6 z-20 pointer-events-none">
-                <span id="scan-status" class="bg-green-500/90 text-black text-xs font-bold px-3 py-1.5 rounded-full uppercase tracking-wider shadow-lg flex items-center gap-1">
+                <span id="scan-status"
+                    class="bg-green-500/90 text-black text-xs font-bold px-3 py-1.5 rounded-full uppercase tracking-wider shadow-lg flex items-center gap-1">
                     <span class="w-2 h-2 bg-black rounded-full animate-pulse"></span>
                     Activo
                 </span>
@@ -98,15 +157,17 @@
         </div>
 
         <!-- HISTORIAL (Panel Deslizable Inferior) -->
-        <div class="bg-gray-900 border-t border-gray-800 h-[35%] flex flex-col shrink-0 rounded-t-2xl -mt-4 z-20 relative shadow-[0_-5px_20px_rgba(0,0,0,0.5)]">
+        <div
+            class="bg-gray-900 border-t border-gray-800 h-[35%] flex flex-col shrink-0 rounded-t-2xl -mt-4 z-20 relative shadow-[0_-5px_20px_rgba(0,0,0,0.5)]">
             <!-- Barra de agarre visual -->
             <div class="w-full flex justify-center pt-3 pb-1">
                 <div class="w-12 h-1.5 bg-gray-700 rounded-full"></div>
             </div>
-            
+
             <div class="px-4 py-2 border-b border-gray-800 flex justify-between items-center">
                 <h3 class="text-sm font-semibold text-gray-300">Historial de Escaneos</h3>
-                <span class="text-[10px] bg-gray-800 text-gray-500 px-2 py-0.5 rounded border border-gray-700">HOY</span>
+                <span
+                    class="text-[10px] bg-gray-800 text-gray-500 px-2 py-0.5 rounded border border-gray-700">HOY</span>
             </div>
 
             <div id="history-list" class="flex-grow overflow-y-auto p-3 space-y-2.5 scrollbar-hide">
@@ -117,7 +178,7 @@
 
     <script src="js/libs/html5-qrcode.min.js"></script>
     <script src="js/app.js"></script>
-    
+
     <!-- Registrar Service Worker para PWA offline -->
     <script>
         if ('serviceWorker' in navigator) {
@@ -125,7 +186,7 @@
                 navigator.serviceWorker.register('./js/sw.js')
                     .then(reg => {
                         console.log('✅ Service Worker registrado:', reg.scope);
-                        
+
                         // Escuchar actualizaciones
                         reg.addEventListener('updatefound', () => {
                             const newWorker = reg.installing;
@@ -173,4 +234,5 @@
         }
     </script>
 </body>
+
 </html>
