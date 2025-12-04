@@ -8,20 +8,25 @@
     <link rel="manifest" href="manifest.json">
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <!-- Iconos Phosphor -->
     <script src="https://unpkg.com/@phosphor-icons/web"></script>
     <style>
+        :root {
+            --bg-card: #0b0b0f;
+            --text-main: #e6eef6;
+            --text-muted: #9aa4b2;
+            --brand-red: #dc2626;
+        }
+
         body {
             font-family: 'Inter', sans-serif;
             -webkit-tap-highlight-color: transparent;
+            background-color: #000;
         }
 
-        /* Estética tipo admin: header oscuro profesional */
         .app-header {
             display: flex;
             align-items: center;
             justify-content: space-between;
-            gap: 12px;
             padding: 12px 16px;
             background: linear-gradient(180deg, rgba(255, 255, 255, 0.02), transparent);
             border-bottom: 1px solid #131316;
@@ -31,179 +36,166 @@
         .header-left {
             display: flex;
             align-items: center;
-            gap: 12px
+            gap: 12px;
+        }
+
+        .header-left img {
+            height: 32px;
+            filter: brightness(0) invert(1);
         }
 
         .header-title {
             font-weight: 700;
             font-size: 1rem;
-            color: #e6eef6
+            color: var(--text-main);
         }
 
-        #scan-log {
-            background: #071018;
-            color: #9aa4b2;
-            padding: 6px 10px;
-            border-radius: 8px;
-            border: 1px solid #12202a;
-            font-size: 12px;
-            min-width: 180px;
-            max-width: 420px;
-            overflow: hidden;
-            text-overflow: ellipsis;
-            white-space: nowrap
-        }
-
-        /* Animación suave para items del historial */
-        .history-item {
-            animation: slideIn 0.3s ease-out;
-        }
-
-        @keyframes slideIn {
-            from {
-                opacity: 0;
-                transform: translateY(-10px);
-            }
-
-            to {
-                opacity: 1;
-                transform: translateY(0);
-            }
-        }
-
-        /* Ajuste para que el video ocupe todo el contenedor sin bordes raros */
         .scanner-video-container video {
             object-fit: cover;
             width: 100% !important;
             height: 100% !important;
         }
+
+        /* Search Input Style */
+        .search-container {
+            position: absolute;
+            top: 70px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 90%;
+            max-width: 400px;
+            z-index: 40;
+        }
+
+        .search-input {
+            width: 100%;
+            background: rgba(11, 11, 15, 0.85);
+            backdrop-filter: blur(8px);
+            border: 1px solid #333;
+            color: white;
+            padding: 10px 15px;
+            padding-right: 40px;
+            border-radius: 12px;
+            font-size: 14px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+            transition: all 0.2s;
+        }
+
+        .search-input:focus {
+            border-color: var(--brand-red);
+            outline: none;
+            background: rgba(11, 11, 15, 0.95);
+        }
+
+        .search-icon {
+            position: absolute;
+            right: 12px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: var(--text-muted);
+        }
+
+        /* Results List */
+        #search-results {
+            margin-top: 8px;
+            background: rgba(11, 11, 15, 0.95);
+            backdrop-filter: blur(10px);
+            border: 1px solid #333;
+            border-radius: 12px;
+            overflow: hidden;
+            max-height: 60vh;
+            overflow-y: auto;
+        }
     </style>
 </head>
 
-<body class="bg-gray-950 text-gray-100 h-screen flex flex-col overflow-hidden">
+<body class="text-gray-100 h-screen flex flex-col overflow-hidden">
 
-    <!-- Header Fijo (estética oscura, log al lado del logo) -->
+    <!-- Header -->
     <header class="app-header">
         <div class="header-left">
-            <button onclick="requestCameraPermission()"
-                class="w-full max-w-xs bg-red-600 hover:bg-red-700 text-white font-bold py-4 rounded-xl shadow-lg transition-transform active:scale-95 flex items-center justify-center gap-2">
-                ACTIVAR CÁMARA
-            </button>
-            <p id="error-msg" class="text-red-400 text-xs mt-6 font-mono hidden"></p>
+            <img src="img/logo_bw.png" alt="Logo">
+            <span class="header-title">Scanner</span>
+        </div>
+        <div id="scan-status" class="hidden">
+            <span class="w-2 h-2 bg-green-500 rounded-full animate-pulse inline-block mr-1"></span>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <div class="relative flex-grow flex flex-col bg-black overflow-hidden">
+
+        <!-- Search Bar -->
+        <div class="search-container">
+            <input type="text" id="manual-search" class="search-input"
+                placeholder="Buscar código, EAN o descripción...">
+            <i class="ph ph-magnifying-glass search-icon"></i>
+
+            <div id="search-results" class="hidden">
+                <div id="results-list" class="flex flex-col"></div>
+                <div class="p-2 border-t border-gray-800 text-center">
+                    <button onclick="closeSearch()"
+                        class="text-xs text-red-400 font-bold uppercase tracking-wider py-2 w-full">Cerrar</button>
+                </div>
+            </div>
         </div>
 
-        <!-- CONTENEDOR CÁMARA -->
-        <div id="scanner-container" class="relative flex-grow overflow-hidden bg-black">
-            <!-- El video se inyecta acá -->
+        <!-- Scanner View -->
+        <div id="scanner-container" class="relative w-full h-full">
             <div id="reader" class="w-full h-full scanner-video-container"></div>
 
-            <!-- Guía Visual (Cuadrado Rojo) -->
+            <!-- Visual Guide -->
             <div class="absolute inset-0 pointer-events-none z-10 flex items-center justify-center">
                 <div
-                    class="w-[80%] aspect-[3/2] border-2 border-red-500/80 rounded-lg shadow-[0_0_0_9999px_rgba(0,0,0,0.5)] relative">
-                    <!-- Esquinas decorativas -->
-                    <div class="absolute top-0 left-0 w-4 h-4 border-t-4 border-l-4 border-red-500 -mt-1 -ml-1"></div>
-                    <div class="absolute top-0 right-0 w-4 h-4 border-t-4 border-r-4 border-red-500 -mt-1 -mr-1"></div>
-                    <div class="absolute bottom-0 left-0 w-4 h-4 border-b-4 border-l-4 border-red-500 -mb-1 -ml-1">
+                    class="w-[75%] aspect-[3/2] border-2 border-white/20 rounded-xl relative shadow-[0_0_0_9999px_rgba(0,0,0,0.6)]">
+                    <div
+                        class="absolute top-0 left-0 w-6 h-6 border-t-4 border-l-4 border-red-500 -mt-1 -ml-1 rounded-tl-lg">
                     </div>
-                    <div class="absolute bottom-0 right-0 w-4 h-4 border-b-4 border-r-4 border-red-500 -mb-1 -mr-1">
+                    <div
+                        class="absolute top-0 right-0 w-6 h-6 border-t-4 border-r-4 border-red-500 -mt-1 -mr-1 rounded-tr-lg">
+                    </div>
+                    <div
+                        class="absolute bottom-0 left-0 w-6 h-6 border-b-4 border-l-4 border-red-500 -mb-1 -ml-1 rounded-bl-lg">
+                    </div>
+                    <div
+                        class="absolute bottom-0 right-0 w-6 h-6 border-b-4 border-r-4 border-red-500 -mb-1 -mr-1 rounded-br-lg">
                     </div>
                 </div>
             </div>
 
-            <!-- Botón Rotar (Flotante Abajo Izq) -->
+            <!-- Controls -->
             <button onclick="switchCamera()"
-                class="absolute bottom-6 left-6 z-20 bg-gray-900/80 backdrop-blur border border-gray-600 text-white p-3 rounded-full shadow-lg active:scale-90 transition-all">
-                <i class="ph-bold ph-arrows-clockwise text-2xl"></i>
+                class="absolute bottom-8 left-8 z-20 bg-gray-900/60 backdrop-blur p-3 rounded-full border border-white/10 active:scale-90 transition-all">
+                <i class="ph-bold ph-arrows-clockwise text-xl text-white"></i>
             </button>
 
-            <!-- Status (Flotante Abajo Der) -->
-            <div class="absolute bottom-6 right-6 z-20 pointer-events-none">
-                <span id="scan-status"
-                    class="bg-green-500/90 text-black text-xs font-bold px-3 py-1.5 rounded-full uppercase tracking-wider shadow-lg flex items-center gap-1">
-                    <span class="w-2 h-2 bg-black rounded-full animate-pulse"></span>
-                    Activo
-                </span>
+            <div id="error-msg"
+                class="absolute bottom-20 left-0 right-0 text-center text-red-500 text-xs font-mono bg-black/80 py-1 hidden">
             </div>
         </div>
 
-        <!-- HISTORIAL (Panel Deslizable Inferior) -->
+        <!-- History Panel (Bottom Sheet) -->
         <div
-            class="bg-gray-900 border-t border-gray-800 h-[35%] flex flex-col shrink-0 rounded-t-2xl -mt-4 z-20 relative shadow-[0_-5px_20px_rgba(0,0,0,0.5)]">
-            <!-- Barra de agarre visual -->
+            class="bg-[#0b0b0f] border-t border-gray-800 h-[30%] flex flex-col shrink-0 z-20 rounded-t-2xl shadow-[0_-5px_30px_rgba(0,0,0,0.5)]">
             <div class="w-full flex justify-center pt-3 pb-1">
-                <div class="w-12 h-1.5 bg-gray-700 rounded-full"></div>
+                <div class="w-10 h-1 bg-gray-700 rounded-full"></div>
             </div>
-
-            <div class="px-4 py-2 border-b border-gray-800 flex justify-between items-center">
-                <h3 class="text-sm font-semibold text-gray-300">Historial de Escaneos</h3>
-                <span
-                    class="text-[10px] bg-gray-800 text-gray-500 px-2 py-0.5 rounded border border-gray-700">HOY</span>
+            <div class="px-4 py-2 flex justify-between items-center border-b border-gray-800/50">
+                <h3 class="text-xs font-bold text-gray-400 uppercase tracking-wider">Historial Reciente</h3>
+                <button onclick="clearHistory()" class="text-[10px] text-red-400 hover:text-red-300">BORRAR</button>
             </div>
-
-            <div id="history-list" class="flex-grow overflow-y-auto p-3 space-y-2.5 scrollbar-hide">
-                <!-- Los items se agregan acá por JS -->
-            </div>
+            <div id="history-list" class="flex-grow overflow-y-auto p-3 space-y-2 scrollbar-hide"></div>
         </div>
-        </main>
 
-        <script src="js/libs/html5-qrcode.min.js"></script>
-        <script src="js/app.js"></script>
+    </div>
 
-        <!-- Registrar Service Worker para PWA offline -->
-        <script>
-            if ('serviceWorker' in navigator) {
-                window.addEventListener('load', () => {
-                    navigator.serviceWorker.register('./js/sw.js')
-                        .then(reg => {
-                            console.log('✅ Service Worker registrado:', reg.scope);
-
-                            // Escuchar actualizaciones
-                            reg.addEventListener('updatefound', () => {
-                                const newWorker = reg.installing;
-                                newWorker.addEventListener('statechange', () => {
-                                    if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-                                        console.log('🔄 Actualización disponible');
-                                        // Mostrar notificación opcional
-                                        showUpdateNotification();
-                                    }
-                                });
-                            });
-                        })
-                        .catch(err => {
-                            console.warn('⚠️ Error registrando Service Worker:', err.message);
-                        });
-                });
-            }
-
-            /**
-             * Notificar actualizaciones disponibles (opcional)
-             */
-            function showUpdateNotification() {
-                const updateMsg = document.createElement('div');
-                updateMsg.style.cssText = `
-                position: fixed;
-                bottom: 20px;
-                left: 20px;
-                right: 20px;
-                background: #2563eb;
-                color: white;
-                padding: 12px;
-                border-radius: 8px;
-                z-index: 9999;
-                font-size: 14px;
-                font-weight: 600;
-                box-shadow: 0 4px 12px rgba(0,0,0,0.3);
-            `;
-                updateMsg.innerText = '🔄 Actualización disponible. Recarga la página.';
-                document.body.appendChild(updateMsg);
-            }
-
-            // Detectar si se ejecuta como PWA
-            if (window.navigator.standalone === true) {
-                console.log('📱 Ejecutándose como PWA instalada');
-            }
-        </script>
+    <script src="js/libs/html5-qrcode.min.js"></script>
+    <script src="js/app.js"></script>
+    <script>
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('./js/sw.js').catch(() => { });
+        }
+    </script>
 </body>
 
 </html>
