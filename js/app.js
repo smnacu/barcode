@@ -1,11 +1,24 @@
 /**
  * app.js - Scanner de códigos de barras EAN-13
- * Con sistema de logging para debug
+ * Con barra de estado visible y logging
  */
 
 // ============================================================================
-// SISTEMA DE LOG
+// BARRA DE ESTADO Y LOG
 // ============================================================================
+function setStatus(message, type) {
+    type = type || 'scanning';
+    var statusBar = document.getElementById('status-bar');
+    var statusText = document.getElementById('status-text');
+
+    if (statusBar && statusText) {
+        statusBar.className = 'status-message ' + type;
+        statusText.textContent = message;
+    }
+
+    addLog(message, type);
+}
+
 function addLog(message, type) {
     type = type || 'info';
     var logContent = document.getElementById('log-content');
@@ -17,7 +30,6 @@ function addLog(message, type) {
     entry.textContent = '[' + time + '] ' + message;
     logContent.insertBefore(entry, logContent.firstChild);
 
-    // Limitar a 50 entradas
     while (logContent.children.length > 50) {
         logContent.removeChild(logContent.lastChild);
     }
@@ -39,7 +51,6 @@ var SCAN_COOLDOWN_MS = 3000;
 var STORAGE_KEY = 'barcodeC_history';
 var MAX_HISTORY_ITEMS = 30;
 
-// Audio beep simple
 var beep = null;
 try {
     beep = new Audio('data:audio/wav;base64,UklGRl9vT19XQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YU');
@@ -49,17 +60,14 @@ try {
 // INICIALIZACIÓN
 // ============================================================================
 document.addEventListener('DOMContentLoaded', function () {
-    addLog('App iniciada - v20241204b', 'info');
+    setStatus('Iniciando...', 'scanning');
     loadHistory();
 
-    // Verificar que la librería está cargada
     if (typeof Html5Qrcode === 'undefined') {
-        addLog('ERROR: html5-qrcode no cargada!', 'error');
+        setStatus('ERROR: Librería no cargada', 'error');
         return;
     }
-    addLog('Librería html5-qrcode OK', 'success');
 
-    // Pequeño delay para asegurar que el DOM esté listo
     setTimeout(function () {
         startScanner();
     }, 500);
@@ -69,21 +77,15 @@ document.addEventListener('DOMContentLoaded', function () {
 // SCANNER
 // ============================================================================
 function startScanner() {
-    addLog('Iniciando scanner...', 'info');
-
     if (isCameraBusy) {
-        addLog('Cámara ocupada, saltando', 'error');
+        setStatus('Cámara ocupada...', 'scanning');
         return;
     }
     isCameraBusy = true;
+    setStatus('Abriendo cámara...', 'scanning');
 
-    var errorMsg = document.getElementById('error-msg');
-    if (errorMsg) errorMsg.classList.remove('visible');
-
-    // Limpiar instancia previa
     var cleanup = Promise.resolve();
     if (html5QrcodeScanner) {
-        addLog('Limpiando scanner previo...', 'info');
         cleanup = stopCurrentScanner();
     }
 
@@ -92,19 +94,17 @@ function startScanner() {
     }).then(function () {
         var reader = document.getElementById('reader');
         if (!reader) {
-            addLog('ERROR: Elemento #reader no encontrado!', 'error');
+            setStatus('ERROR: No se encontró el visor', 'error');
             isCameraBusy = false;
-            return Promise.reject('No reader element');
+            return Promise.reject('No reader');
         }
         reader.innerHTML = '';
 
-        addLog('Creando instancia Html5Qrcode...', 'info');
         html5QrcodeScanner = new Html5Qrcode("reader");
 
-        // Config OPTIMIZADA para EAN-13 (códigos de barras)
         var config = {
             fps: 15,
-            qrbox: { width: 300, height: 80 },
+            qrbox: { width: 280, height: 60 },
             aspectRatio: 1.777,
             disableFlip: true,
             formatsToSupport: [
@@ -117,53 +117,25 @@ function startScanner() {
             ]
         };
 
-        addLog('Config: fps=' + config.fps + ', qrbox=' + config.qrbox.width + 'x' + config.qrbox.height, 'info');
-        addLog('Formatos: EAN_13, EAN_8, UPC_A, UPC_E, CODE_128, CODE_39', 'info');
-        addLog('Solicitando cámara: ' + currentFacingMode, 'info');
-
         return html5QrcodeScanner.start(
             { facingMode: currentFacingMode },
             config,
             onScanSuccess,
-            onScanFailure
+            function () { }
         ).catch(function (err) {
             addLog('Intento 1 falló: ' + err, 'error');
-            addLog('Probando fallback "environment"...', 'info');
-            return html5QrcodeScanner.start(
-                "environment",
-                config,
-                onScanSuccess,
-                onScanFailure
-            );
+            return html5QrcodeScanner.start("environment", config, onScanSuccess, function () { });
         }).catch(function (err) {
             addLog('Intento 2 falló: ' + err, 'error');
-            addLog('Probando fallback "user"...', 'info');
-            return html5QrcodeScanner.start(
-                "user",
-                config,
-                onScanSuccess,
-                onScanFailure
-            );
+            return html5QrcodeScanner.start("user", config, onScanSuccess, function () { });
         });
     }).then(function () {
-        addLog('✓ SCANNER INICIADO OK', 'success');
+        setStatus('Escaneando... apuntá el código', 'success');
         isCameraBusy = false;
     }).catch(function (err) {
-        addLog('ERROR FATAL: ' + err, 'error');
+        setStatus('ERROR cámara: ' + (err.message || err), 'error');
         isCameraBusy = false;
-        if (errorMsg) {
-            var msg = err.message || String(err);
-            if (msg.indexOf('transition') === -1) {
-                errorMsg.textContent = 'Cámara: ' + msg;
-                errorMsg.classList.add('visible');
-            }
-        }
     });
-}
-
-function onScanFailure(error) {
-    // Este callback se llama constantemente cuando NO encuentra código
-    // Solo logueamos errores reales, no el "no code found"
 }
 
 function stopCurrentScanner() {
@@ -172,7 +144,6 @@ function stopCurrentScanner() {
             resolve();
             return;
         }
-
         try {
             var state = html5QrcodeScanner.getState();
             if (state === Html5QrcodeScannerState.SCANNING || state === Html5QrcodeScannerState.PAUSED) {
@@ -180,8 +151,7 @@ function stopCurrentScanner() {
                     try { html5QrcodeScanner.clear(); } catch (e) { }
                     html5QrcodeScanner = null;
                     resolve();
-                }).catch(function (e) {
-                    addLog('Error al parar scanner: ' + e, 'error');
+                }).catch(function () {
                     html5QrcodeScanner = null;
                     resolve();
                 });
@@ -191,7 +161,6 @@ function stopCurrentScanner() {
                 resolve();
             }
         } catch (e) {
-            addLog('Error en stopCurrentScanner: ' + e, 'error');
             html5QrcodeScanner = null;
             resolve();
         }
@@ -201,78 +170,62 @@ function stopCurrentScanner() {
 function switchCamera() {
     if (isCameraBusy) return;
     currentFacingMode = (currentFacingMode === "user") ? "environment" : "user";
-    addLog('Cambiando cámara a: ' + currentFacingMode, 'info');
+    setStatus('Cambiando cámara...', 'scanning');
     startScanner();
 }
 
 function onScanSuccess(decodedText, decodedResult) {
     var now = Date.now();
+    var formatName = decodedResult.result.format ? decodedResult.result.format.formatName : 'UNKNOWN';
 
-    addLog('DETECTADO: ' + decodedText, 'scan');
-    addLog('Formato: ' + (decodedResult.result.format ? decodedResult.result.format.formatName : 'desconocido'), 'scan');
+    addLog('DETECTADO: ' + decodedText + ' (' + formatName + ')', 'scan');
 
     if (decodedText === lastScannedEAN && (now - lastScanTime) < SCAN_COOLDOWN_MS) {
-        addLog('Código repetido, ignorando (cooldown)', 'info');
         return;
     }
-    if (isProcessing) {
-        addLog('Ya procesando, ignorando', 'info');
-        return;
-    }
+    if (isProcessing) return;
 
     isProcessing = true;
     lastScannedEAN = decodedText;
     lastScanTime = now;
 
-    // Feedback visual y sonoro
     if (beep) try { beep.play(); } catch (e) { }
-    showStatus(true);
 
-    // Flash verde en el scanner
-    var scannerContainer = document.querySelector('.scanner-container');
-    if (scannerContainer) {
-        scannerContainer.style.boxShadow = '0 0 30px #22c55e';
+    // Flash verde
+    var container = document.querySelector('.scanner-container');
+    if (container) {
+        container.style.borderColor = '#22c55e';
+        container.style.boxShadow = '0 0 20px #22c55e';
         setTimeout(function () {
-            scannerContainer.style.boxShadow = '';
+            container.style.borderColor = '#333';
+            container.style.boxShadow = '';
         }, 500);
     }
 
-    addLog('Buscando en API: ' + decodedText, 'info');
+    setStatus('Leído: ' + decodedText + ' - Buscando...', 'scanning');
 
     fetch('api/buscar.php?codigo=' + encodeURIComponent(decodedText))
-        .then(function (response) {
-            addLog('Respuesta API: ' + response.status, 'info');
-            return response.json();
-        })
+        .then(function (response) { return response.json(); })
         .then(function (data) {
             if (data.encontrado) {
-                addLog('✓ Producto encontrado: ' + (data.producto ? data.producto.descripcion : 'sin desc'), 'success');
+                var desc = data.producto ? data.producto.descripcion : 'Encontrado';
+                setStatus('✓ ' + desc, 'success');
                 handleFound(data);
             } else {
-                addLog('✗ Producto NO encontrado', 'error');
+                setStatus('✗ No encontrado: ' + decodedText, 'error');
                 handleNotFound(decodedText);
             }
         })
         .catch(function (error) {
-            addLog('ERROR API: ' + error.message, 'error');
+            setStatus('ERROR: ' + error.message, 'error');
             addToHistory(decodedText, 'Error: ' + error.message, null, false);
         })
         .finally(function () {
             setTimeout(function () {
                 isProcessing = false;
-                showStatus(false);
+                setStatus('Escaneando... apuntá el código', 'success');
             }, SCAN_COOLDOWN_MS);
         });
-}
-
-function showStatus(processing) {
-    var badge = document.getElementById('scan-status');
-    if (!badge) return;
-    if (processing) {
-        badge.classList.add('active');
-    } else {
-        badge.classList.remove('active');
-    }
 }
 
 function handleFound(data) {
@@ -285,13 +238,12 @@ function handleFound(data) {
         }
     }
 
-    var title = (data.producto && data.producto.descripcion) ? data.producto.descripcion : 'Producto encontrado';
+    var title = (data.producto && data.producto.descripcion) ? data.producto.descripcion : 'Encontrado';
     var code = (data.producto && (data.producto.ean || data.producto.codigo)) || '';
 
     addToHistory(code, title, fullUrl, true);
 
     if (fullUrl) {
-        addLog('Abriendo PDF: ' + fullUrl, 'info');
         window.open(fullUrl, '_blank');
     }
 }
@@ -310,16 +262,13 @@ function loadHistory() {
         var list = document.getElementById('history-list');
         if (list) {
             if (items.length === 0) {
-                list.innerHTML = '<div class="empty-history">Sin escaneos recientes</div>';
+                list.innerHTML = '<div class="empty-history">Sin escaneos</div>';
             } else {
                 list.innerHTML = '';
                 items.forEach(function (item) { renderHistoryItem(list, item); });
             }
         }
-        addLog('Historial cargado: ' + items.length + ' items', 'info');
-    } catch (e) {
-        addLog('Error cargando historial: ' + e, 'error');
-    }
+    } catch (e) { }
 }
 
 function addToHistory(ean, desc, url, success) {
@@ -352,15 +301,14 @@ function renderHistoryItem(list, item, prepend) {
 
     var actionBtn = '';
     if (item.success && item.url) {
-        actionBtn = '<a href="' + item.url + '" target="_blank" class="open-pdf-btn">ABRIR ↗</a>';
+        actionBtn = '<a href="' + item.url + '" target="_blank" class="open-pdf-btn">ABRIR</a>';
     }
 
     el.innerHTML =
         '<div class="history-item-info">' +
         '<div class="history-item-code">' + escapeHtml(item.ean) + '</div>' +
         '<div class="history-item-desc">' + escapeHtml(item.desc) + '</div>' +
-        '</div>' +
-        '<div>' + actionBtn + '</div>';
+        '</div>' + actionBtn;
 
     if (prepend) {
         list.insertBefore(el, list.firstChild);
@@ -373,9 +321,8 @@ function clearHistory() {
     localStorage.removeItem(STORAGE_KEY);
     var list = document.getElementById('history-list');
     if (list) {
-        list.innerHTML = '<div class="empty-history">Sin escaneos recientes</div>';
+        list.innerHTML = '<div class="empty-history">Sin escaneos</div>';
     }
-    addLog('Historial borrado', 'info');
 }
 
 function escapeHtml(text) {
@@ -397,12 +344,10 @@ if (searchInput) {
     searchInput.addEventListener('input', function (e) {
         var query = e.target.value.trim();
         clearTimeout(searchTimeout);
-
         if (query.length < 2) {
             closeSearch();
             return;
         }
-
         searchTimeout = setTimeout(function () { performManualSearch(query); }, 400);
     });
 }
@@ -412,7 +357,6 @@ function closeSearch() {
 }
 
 function performManualSearch(query) {
-    addLog('Búsqueda manual: ' + query, 'info');
     var fd = new FormData();
     fd.append('codigo', query);
     fd.append('modo', 'lista');
@@ -420,9 +364,7 @@ function performManualSearch(query) {
     fetch('api/buscar.php', { method: 'POST', body: fd })
         .then(function (res) { return res.json(); })
         .then(function (data) { renderSearchResults(data); })
-        .catch(function (err) {
-            addLog('Error búsqueda: ' + err, 'error');
-        });
+        .catch(function (err) { addLog('Error búsqueda: ' + err, 'error'); });
 }
 
 function renderSearchResults(data) {
@@ -435,14 +377,12 @@ function renderSearchResults(data) {
         return;
     }
 
-    addLog('Resultados búsqueda: ' + data.resultados.length, 'info');
-
     data.resultados.forEach(function (item) {
         var el = document.createElement('div');
         el.className = 'result-item';
         el.innerHTML =
             '<div class="result-item-title">' + escapeHtml(item.descripcion) + '</div>' +
-            '<div class="result-item-code">Código: ' + escapeHtml(item.codigo) + ' | EAN: ' + escapeHtml(item.ean) + '</div>';
+            '<div class="result-item-code">EAN: ' + escapeHtml(item.ean) + '</div>';
 
         el.onclick = function () {
             onScanSuccess(item.codigo, { result: { format: { formatName: 'MANUAL' } } });
@@ -453,8 +393,4 @@ function renderSearchResults(data) {
     });
 
     if (searchResults) searchResults.classList.add('visible');
-}
-
-function goToAdmin() {
-    window.location.href = 'admin.html';
 }
