@@ -3,6 +3,7 @@
 // ============================================================================
 let html5QrcodeScanner = null;
 let isProcessing = false;
+let isCameraBusy = false; // Mutex para evitar condiciones de carrera
 let currentFacingMode = "environment"; // Default: Trasera
 let lastScannedEAN = null;
 let lastScanTime = 0;
@@ -31,24 +32,40 @@ function ensureAndroidCompatibility() {
 // LÓGICA DEL ESCÁNER
 // ============================================================================
 async function startScanner() {
+    // Evitar re-entrada si ya estamos iniciando/deteniendo
+    if (isCameraBusy) return;
+    isCameraBusy = true;
+
     const errorMsg = document.getElementById('error-msg');
     if (errorMsg) errorMsg.classList.add('hidden');
 
-    if (html5QrcodeScanner) {
-        try { await html5QrcodeScanner.stop(); html5QrcodeScanner.clear(); } catch (e) { }
-        html5QrcodeScanner = null;
-    }
-
     try {
+        // Limpieza robusta de instancia previa
+        if (html5QrcodeScanner) {
+            try {
+                // Solo intentar detener si está escaneando o pausado
+                if (html5QrcodeScanner.getState() === Html5QrcodeScannerState.SCANNING ||
+                    html5QrcodeScanner.getState() === Html5QrcodeScannerState.PAUSED) {
+                    await html5QrcodeScanner.stop();
+                }
+                html5QrcodeScanner.clear();
+            } catch (e) {
+                console.warn("Error stopping/clearing scanner:", e);
+            }
+            html5QrcodeScanner = null;
+        }
+
+        // Pequeña pausa para asegurar que el DOM y la cámara se liberen
+        await new Promise(r => setTimeout(r, 100));
+
         const reader = document.getElementById('reader');
         if (reader) reader.innerHTML = '';
 
         html5QrcodeScanner = new Html5Qrcode("reader");
 
-        // Configuración optimizada para rendimiento
         const config = {
-            fps: 10, // Reducido para mejorar rendimiento
-            qrbox: { width: 200, height: 200 }, // Caja más pequeña
+            fps: 10,
+            qrbox: { width: 200, height: 200 },
             aspectRatio: 1.0,
             disableFlip: false,
             formatsToSupport: [
@@ -60,31 +77,41 @@ async function startScanner() {
 
         const constraints = {
             facingMode: currentFacingMode,
-            width: { ideal: 640 }, // Limitar resolución
+            width: { ideal: 640 },
             height: { ideal: 480 }
         };
 
         try {
             await html5QrcodeScanner.start(constraints, config, onScanSuccess, () => { });
         } catch (err) {
-            console.warn('Fallback video mode');
+            console.warn('Primary start failed, trying fallback video mode', err);
             await html5QrcodeScanner.start({ video: true }, config, onScanSuccess, () => { });
         }
 
     } catch (err) {
         console.error("Error cámara:", err);
         if (errorMsg) {
-            errorMsg.innerText = 'Error: ' + (err.message || err);
-            errorMsg.classList.remove('hidden');
+            // Ignorar error "already under transition" si ocurre a pesar del bloqueo
+            if (!err.message?.includes("already under transition")) {
+                errorMsg.innerText = 'Error: ' + (err.message || err);
+                errorMsg.classList.remove('hidden');
+            }
         }
+    } finally {
+        isCameraBusy = false;
     }
 }
 
 async function switchCamera() {
+    if (isCameraBusy) return;
+
     const btnIcon = document.querySelector('button[onclick="switchCamera()"] i');
     if (btnIcon) btnIcon.classList.add('animate-spin');
+
     currentFacingMode = (currentFacingMode === "user") ? "environment" : "user";
+
     await startScanner();
+
     if (btnIcon) setTimeout(() => btnIcon.classList.remove('animate-spin'), 500);
 }
 
