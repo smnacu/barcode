@@ -208,11 +208,12 @@ async function onScanSuccess(decodedText, decodedResult) {
     }
 
     try {
-        const response = await fetch(`api/buscar.php?ean=${encodeURIComponent(decodedText)}`);
+        // Fix: Usar 'codigo' como parámetro unificado para el backend
+        const response = await fetch(`api/buscar.php?codigo=${encodeURIComponent(decodedText)}`);
         if (!response.ok) throw new Error(`HTTP ${response.status}`);
         const data = await response.json();
 
-        if (data.found) {
+        if (data.encontrado) {
             handleFound(data);
         } else {
             handleNotFound(decodedText);
@@ -236,10 +237,24 @@ function onScanFailure(error) {
 }
 
 function handleFound(data) {
-    const fullUrl = data.pdf_base_url + data.pdf_name + '.pdf';
-    addToHistory(data.ean, data.descripcion, fullUrl, true);
-    window.open(fullUrl, '_blank');
-    updateScanLog(`OK · ${data.ean} · ${data.descripcion}`);
+    // La URL ya viene construida desde el backend (api/buscar.php)
+    // Si es intranet, vendrá como http://192.168.../CODIGO.pdf
+    let fullUrl = data.pdf_url;
+
+    // Fallback por si acaso el backend no mandó pdf_url (aunque debería)
+    if (!fullUrl && data.pdf) {
+        if (data.pdf.startsWith('http')) {
+            fullUrl = data.pdf;
+        } else {
+            fullUrl = 'api/ver_pdf.php?file=' + urlencode(data.pdf);
+        }
+    }
+
+    addToHistory(data.producto.ean || data.producto.codigo, data.producto.descripcion, fullUrl, true);
+    if (fullUrl) {
+        window.open(fullUrl, '_blank');
+    }
+    updateScanLog(`OK · ${data.producto.ean || data.producto.codigo} · ${data.producto.descripcion}`);
 }
 
 function handleNotFound(ean) {

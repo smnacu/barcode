@@ -149,60 +149,6 @@ function buscarEnLibro($codigo, $config, $modo = 'unico') {
     } else {
         return [
             'encontrado' => count($resultados) > 0,
-            'resultados' => $resultados,
-            'fuente' => basename($csv_path)
-        ];
-    }
-}
-
-function buscarPDF($producto, $config) {
-    $pdf_path_config = $config['ruta_pdf'];
-    
-    // Caso 1: URL HTTP/HTTPS
-    if (preg_match('/^https?:\/\//i', $pdf_path_config)) {
-        $pdf_path_config = rtrim($pdf_path_config, '/') . '/';
-        
-        $candidates = [];
-        if (!empty($producto['ean'])) $candidates[] = $producto['ean'];
-        if (!empty($producto['codigo'])) $candidates[] = $producto['codigo'];
-        
-        foreach ($candidates as $code) {
-            $url = $pdf_path_config . $code . '.pdf';
-            // Verificar si existe (HEAD request)
-            $headers = @get_headers($url);
-            if ($headers && strpos($headers[0], '200') !== false) {
-                return $url;
-            }
-        }
-        return null;
-    }
-
-    // Caso 2: Ruta Local / Red
-    if (!is_dir($pdf_path_config) && is_dir(__DIR__ . '/' . $pdf_path_config)) {
-        $pdf_path_config = __DIR__ . '/' . $pdf_path_config;
-    }
-    $pdf_path_config = rtrim($pdf_path_config, '/\\') . DIRECTORY_SEPARATOR;
-
-    if (!is_dir($pdf_path_config)) return null;
-    $pdfs = glob($pdf_path_config . '*.{pdf,PDF}', GLOB_BRACE);
-    
-    $busquedas = [];
-    if (!empty($producto['ean'])) $busquedas[] = preg_replace('/[^a-z0-9]/', '', strtolower($producto['ean']));
-    if (!empty($producto['codigo'])) $busquedas[] = preg_replace('/[^a-z0-9]/', '', strtolower($producto['codigo']));
-    
-    foreach ($pdfs as $pdfPath) {
-        $nombreNorm = preg_replace('/[^a-z0-9]/', '', strtolower(pathinfo($pdfPath, PATHINFO_FILENAME)));
-        foreach($busquedas as $b) {
-             if (strpos($nombreNorm, $b) !== false) return basename($pdfPath);
-        }
-    }
-    return null;
-}
-
-$codigo = limpiarString($_REQUEST['codigo'] ?? '');
-$modo = $_REQUEST['modo'] ?? 'unico'; // 'unico' (scanner) o 'lista' (buscador manual)
-
-if (empty($codigo)) {
     http_response_code(400);
     echo simpleJsonEncode(['error' => true, 'mensaje' => 'Codigo requerido']);
     exit;
