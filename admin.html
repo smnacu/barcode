@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="es">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -15,32 +16,124 @@
             --error: #f87171;
             --warning: #f59e0b;
         }
+
         /* Estilos específicos para Admin */
-        .admin-container { max-width: 1200px; margin: 0 auto; padding: 20px; }
-        .toolbar { background: var(--bg-card); padding: 15px; border-radius: 8px; margin-bottom: 20px; display: flex; gap: 10px; flex-wrap: wrap; align-items: flex-end; border: 1px solid #333; }
-        .data-table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 14px; color: var(--text-main); }
-        .data-table th, .data-table td { border: 1px solid #444; padding: 8px; text-align: left; }
-        .data-table th { background-color: #000; color: white; border-bottom: 2px solid var(--brand-red); }
-        .data-table tr:nth-child(even) { background-color: #1a1a1a; }
-        .data-table tr:hover { background-color: #252525; }
-        .editable { background: #333; cursor: pointer; color: #fff; }
-        .input-group { margin-bottom: 0; flex: 1; min-width: 200px;}
-        .input-group label { display: block; font-weight: bold; margin-bottom: 5px; font-size: 0.9em; color: var(--text-muted); }
-        .input-group input, .input-group select { width: 100%; padding: 10px; border: 1px solid #444; border-radius: 4px; background: var(--bg-input); color: var(--text-main); }
-        
+        .admin-container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .toolbar {
+            background: var(--bg-card);
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            align-items: flex-end;
+            border: 1px solid #333;
+        }
+
+        .data-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 10px;
+            font-size: 14px;
+            color: var(--text-main);
+        }
+
+        .data-table th,
+        .data-table td {
+            border: 1px solid #444;
+            padding: 8px;
+            text-align: left;
+        }
+
+        .data-table th {
+            background-color: #000;
+            color: white;
+            border-bottom: 2px solid var(--brand-red);
+        }
+
+        .data-table tr:nth-child(even) {
+            background-color: #1a1a1a;
+        }
+
+        .data-table tr:hover {
+            background-color: #252525;
+        }
+
+        .editable {
+            background: #333;
+            cursor: pointer;
+            color: #fff;
+        }
+
+        .input-group {
+            margin-bottom: 0;
+            flex: 1;
+            min-width: 200px;
+        }
+
+        .input-group label {
+            display: block;
+            font-weight: bold;
+            margin-bottom: 5px;
+            font-size: 0.9em;
+            color: var(--text-muted);
+        }
+
+        .input-group input,
+        .input-group select {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #444;
+            border-radius: 4px;
+            background: var(--bg-input);
+            color: var(--text-main);
+        }
+
         /* Modal de Login */
         #login-overlay {
-            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(0,0,0,0.9); z-index: 9999;
-            display: flex; justify-content: center; align-items: center;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.9);
+            z-index: 9999;
+            display: flex;
+            justify-content: center;
+            align-items: center;
         }
+
         .login-box {
-            background: var(--bg-card); padding: 30px; border-radius: 8px;
-            text-align: center; width: 90%; max-width: 400px;
-            box-shadow: 0 10px 25px rgba(0,0,0,0.5); border: 1px solid #333;
+            background: var(--bg-card);
+            padding: 30px;
+            border-radius: 8px;
+            text-align: center;
+            width: 90%;
+            max-width: 400px;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
+            border: 1px solid #333;
         }
-        .login-box input { width: 100%; padding: 12px; margin: 15px 0; font-size: 16px; box-sizing: border-box; background: var(--bg-input); color: white; border: 1px solid #444; }
-        .hidden { display: none !important; }
+
+        .login-box input {
+            width: 100%;
+            padding: 12px;
+            margin: 15px 0;
+            font-size: 16px;
+            box-sizing: border-box;
+            background: var(--bg-input);
+            color: white;
+            border: 1px solid #444;
+        }
+
+        .hidden {
+            display: none !important;
+        }
 
         /* Header admin oscuro y profesional */
         .app-header {
@@ -49,18 +142,51 @@
             justify-content: space-between;
             gap: 16px;
             padding: 16px 20px;
-            background: linear-gradient(180deg, rgba(255,255,255,0.02), transparent);
+            background: linear-gradient(180deg, rgba(255, 255, 255, 0.02), transparent);
             border-bottom: 1px solid #131316;
             margin-bottom: 12px;
             color: var(--text-main);
         }
-        .header-left { display:flex; align-items:center; gap:12px }
-        .header-left img { height:44px; filter: brightness(0) invert(1); }
-        .header-title { font-size:18px; font-weight:700; color:var(--text-main) }
-        .header-right { display:flex; align-items:center; gap:12px }
-        #admin-log { background: #071018; color: var(--text-muted); padding:8px 12px; border-radius:8px; font-size:12px; border:1px solid #12202a; min-width:200px; max-width:420px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap }
+
+        .header-left {
+            display: flex;
+            align-items: center;
+            gap: 12px
+        }
+
+        .header-left img {
+            height: 44px;
+            filter: brightness(0) invert(1);
+        }
+
+        .header-title {
+            font-size: 18px;
+            font-weight: 700;
+            color: var(--text-main)
+        }
+
+        .header-right {
+            display: flex;
+            align-items: center;
+            gap: 12px
+        }
+
+        #admin-log {
+            background: #071018;
+            color: var(--text-muted);
+            padding: 8px 12px;
+            border-radius: 8px;
+            font-size: 12px;
+            border: 1px solid #12202a;
+            min-width: 200px;
+            max-width: 420px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap
+        }
     </style>
 </head>
+
 <body>
 
     <!-- Overlay de Login -->
@@ -72,7 +198,8 @@
             <input type="password" id="admin-pass" placeholder="Contraseña">
             <button onclick="doLogin()" class="btn btn-primary btn-lg" style="width:100%">Entrar</button>
             <p id="login-error" style="color: var(--error); margin-top: 10px; display: none;">Clave incorrecta</p>
-            <a href="index.html" style="display:block; margin-top: 20px; color: var(--text-muted);">Volver al Scanner</a>
+            <a href="index.html" style="display:block; margin-top: 20px; color: var(--text-muted);">Volver al
+                Scanner</a>
         </div>
     </div>
 
@@ -96,7 +223,7 @@
         </header>
 
         <div class="admin-container">
-            
+
             <!-- Configuración General -->
             <section class="toolbar">
                 <div class="input-group">
@@ -120,7 +247,7 @@
                         <!-- Se llena con JS -->
                     </select>
                 </div>
-                <div style="flex: 0 0 auto; display: flex; gap: 5px;">
+                <div style="flex: 0 0 auto; display: flex; gap: 15px;">
                     <button onclick="loadData()" class="btn btn-secondary"><i class="fa fa-sync"></i> Recargar</button>
                     <button onclick="addRow()" class="btn btn-primary">+ Fila</button>
                 </div>
@@ -128,7 +255,7 @@
 
             <!-- Subida de Archivos -->
             <section class="toolbar">
-                 <div class="input-group">
+                <div class="input-group">
                     <label>Subir Nuevo CSV al Server</label>
                     <input type="file" id="csv-upload" accept=".csv" style="background: var(--bg-input); color: white;">
                 </div>
@@ -138,7 +265,8 @@
             </section>
 
             <h3 id="table-title" style="color: var(--text-muted)">Datos del archivo: ...</h3>
-            <div style="overflow-x: auto; background: var(--bg-card); padding: 10px; border-radius: 8px; border: 1px solid #333;">
+            <div
+                style="overflow-x: auto; background: var(--bg-card); padding: 10px; border-radius: 8px; border: 1px solid #333;">
                 <table class="data-table" id="csv-table">
                     <thead></thead>
                     <tbody></tbody>
@@ -153,7 +281,7 @@
 
         document.addEventListener('DOMContentLoaded', () => {
             checkAuth();
-            
+
             // Permitir Enter en login
             document.getElementById('admin-pass').addEventListener('keypress', function (e) {
                 if (e.key === 'Enter') doLogin();
@@ -224,11 +352,11 @@
                     console.log('loadConfig recibió:', data);
                     // Llenar inputs
                     document.getElementById('config-pdf-path').value = data.config.pdf_path || '../Pdf/';
-                    
+
                     // Llenar Selectores (El de Config Activa y el de Editor)
                     const selActive = document.getElementById('config-csv-active');
                     const selEditor = document.getElementById('editor-csv-select');
-                    
+
                     selActive.innerHTML = '';
                     selEditor.innerHTML = '';
 
@@ -237,22 +365,22 @@
                         const opt1 = document.createElement('option');
                         opt1.value = f;
                         opt1.innerText = f;
-                        if(f === data.config.active_csv) opt1.selected = true;
+                        if (f === data.config.active_csv) opt1.selected = true;
                         selActive.appendChild(opt1);
 
                         // Selector de Editor (por defecto selecciona el activo también)
                         const opt2 = document.createElement('option');
                         opt2.value = f;
                         opt2.innerText = f;
-                        if(f === data.config.active_csv && currentEditingFile === '') opt2.selected = true;
+                        if (f === data.config.active_csv && currentEditingFile === '') opt2.selected = true;
                         selEditor.appendChild(opt2);
                     });
 
                     // Cargar datos en la tabla (del archivo seleccionado en el editor)
-                    if(currentEditingFile === '') {
+                    if (currentEditingFile === '') {
                         currentEditingFile = data.config.active_csv || data.csv_files[0];
                     }
-                    loadData(); 
+                    loadData();
                 });
         }
 
@@ -261,11 +389,11 @@
             formData.append('action', 'save_config');
             formData.append('pdf_path', document.getElementById('config-pdf-path').value);
             formData.append('active_csv', document.getElementById('config-csv-active').value);
-            
+
             fetch(API, { method: 'POST', body: formData })
                 .then(r => r.json())
                 .then(d => {
-                    if(d.status === 'ok') {
+                    if (d.status === 'ok') {
                         alert('Configuración guardada correctamente.');
                     }
                 });
@@ -279,7 +407,7 @@
             const formData = new FormData();
             formData.append('action', 'get_data');
             formData.append('target_csv', currentEditingFile);
-            
+
             fetch(API, { method: 'POST', body: formData })
                 .then(r => r.json())
                 .then(res => {
@@ -291,21 +419,28 @@
             document.getElementById('config-csv-active').style.border = "2px solid var(--warning)";
         }
 
-        // --- MANEJO DE TABLA (Igual que antes pero apunta a currentEditingFile) ---
+        // --- MANEJO DE TABLA ---
         function renderTable(rows) {
             const table = document.getElementById('csv-table');
             table.innerHTML = '';
-            
-            if(!rows || rows.length === 0) {
+
+            if (!rows || rows.length === 0) {
                 table.innerHTML = '<tbody><tr><td>Archivo vacío o no encontrado</td></tr></tbody>';
                 return;
             }
 
+            // Separar cabecera y cuerpo
+            // Asumimos que la primera fila SIEMPRE es la cabecera
+            const headerRow = rows[0];
+            const bodyRows = rows.slice(1);
+
             const thead = document.createElement('thead');
             const trHead = document.createElement('tr');
-            rows[0].forEach((_, i) => {
+
+            headerRow.forEach((cell, i) => {
                 const th = document.createElement('th');
-                th.innerText = i === 0 ? 'CÓDIGO (Key)' : `Columna ${i}`;
+                // Usar el valor real del CSV o un fallback
+                th.innerText = cell || `Columna ${i}`;
                 trHead.appendChild(th);
             });
             trHead.appendChild(document.createElement('th')).innerText = 'Acciones';
@@ -313,24 +448,28 @@
             table.appendChild(thead);
 
             const tbody = document.createElement('tbody');
-            rows.forEach((row, rowIndex) => {
+            bodyRows.forEach((row, rowIndex) => {
+                // rowIndex relativo a bodyRows. Para editar, necesitamos el índice real en el CSV global.
+                // El índice en CSV global es rowIndex + 1 (porque 0 es header)
+                const realIndex = rowIndex + 1;
+
                 const tr = document.createElement('tr');
                 row.forEach((cell, cellIndex) => {
                     const td = document.createElement('td');
                     td.innerText = cell;
                     td.contentEditable = true;
-                    td.onblur = () => saveCell(rowIndex, cellIndex, td.innerText, row);
+                    td.onblur = () => saveCell(realIndex, cellIndex, td.innerText, row);
                     tr.appendChild(td);
                 });
-                
+
                 const tdAct = document.createElement('td');
                 const btnDel = document.createElement('button');
                 btnDel.innerText = 'X';
-                btnDel.style.background = '#c0392b'; btnDel.style.color='white'; btnDel.style.border='none';
-                btnDel.onclick = () => deleteRow(rowIndex);
+                btnDel.style.background = '#c0392b'; btnDel.style.color = 'white'; btnDel.style.border = 'none';
+                btnDel.onclick = () => deleteRow(realIndex);
                 tdAct.appendChild(btnDel);
                 tr.appendChild(tdAct);
-                
+
                 tbody.appendChild(tr);
             });
             table.appendChild(tbody);
@@ -350,17 +489,17 @@
             const table = document.getElementById('csv-table');
             const cols = table.rows.length > 0 ? table.rows[0].cells.length - 1 : 1;
             const emptyRow = new Array(cols).fill("...");
-            
+
             const fd = new FormData();
             fd.append('action', 'add_row');
             fd.append('target_csv', currentEditingFile);
             emptyRow.forEach((val, i) => fd.append(`row_data[${i}]`, val));
-            
+
             fetch(API, { method: 'POST', body: fd }).then(() => loadData());
         }
 
         function deleteRow(index) {
-            if(!confirm('¿Borrar fila?')) return;
+            if (!confirm('¿Borrar fila?')) return;
             const fd = new FormData();
             fd.append('action', 'delete_row');
             fd.append('target_csv', currentEditingFile);
@@ -370,18 +509,18 @@
 
         function uploadCSV() {
             const fileInput = document.getElementById('csv-upload');
-            if(fileInput.files.length === 0) return;
-            
+            if (fileInput.files.length === 0) return;
+
             const fd = new FormData();
             fd.append('action', 'upload_csv');
             fd.append('file', fileInput.files[0]);
-            
+
             fetch(API, { method: 'POST', body: fd })
                 .then(r => r.json())
                 .then(d => {
-                    if(d.status === 'ok') {
+                    if (d.status === 'ok') {
                         alert('Archivo subido');
-                        loadConfig(); 
+                        loadConfig();
                     } else {
                         alert('Error: ' + d.message);
                     }
@@ -389,4 +528,5 @@
         }
     </script>
 </body>
+
 </html>
