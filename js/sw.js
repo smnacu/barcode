@@ -1,58 +1,61 @@
 /**
- * Service Worker - Caché básico para PWA
- * Versión simplificada para compatibilidad Android 11
+ * Service Worker - Cache PWA mejorado
+ * Estrategia: Network-first para HTML/JS, Cache-first para assets estaticos
  */
 
-var CACHE_NAME = 'barcodeC-v2';
+var CACHE_NAME = 'barcodeC-v3';
 
-// Solo archivos esenciales que existen
 var urlsToCache = [
     './',
     './index.html',
     './admin.html',
     './manifest.json',
-    './css/styles.css',
-    './app.js',
-    './libs/html5-qrcode.min.js',
-    '../img/logo_bw.png'
+    './js/app.js',
+    './js/libs/html5-qrcode.min.js',
+    './img/logo_bw.png',
+    './img/logo.png'
 ];
 
-// Instalación
+// Instalacion
 self.addEventListener('install', function (event) {
+    console.log('[SW] Instalando v3...');
     event.waitUntil(
         caches.open(CACHE_NAME).then(function (cache) {
-            // Intentar cachear pero no fallar si alguno no existe
             return Promise.all(
                 urlsToCache.map(function (url) {
                     return cache.add(url).catch(function (err) {
-                        console.warn('No se pudo cachear:', url);
+                        console.warn('[SW] No se pudo cachear:', url);
                     });
                 })
             );
         }).then(function () {
+            console.log('[SW] Cache completado');
             return self.skipWaiting();
         })
     );
 });
 
-// Activación - limpiar cachés viejos
+// Activacion - limpiar caches viejos
 self.addEventListener('activate', function (event) {
+    console.log('[SW] Activando...');
     event.waitUntil(
         caches.keys().then(function (cacheNames) {
             return Promise.all(
                 cacheNames.filter(function (cacheName) {
                     return cacheName !== CACHE_NAME;
                 }).map(function (cacheName) {
+                    console.log('[SW] Borrando cache viejo:', cacheName);
                     return caches.delete(cacheName);
                 })
             );
         }).then(function () {
+            console.log('[SW] Listo');
             return self.clients.claim();
         })
     );
 });
 
-// Fetch - Network first para API, cache first para assets
+// Fetch
 self.addEventListener('fetch', function (event) {
     var request = event.request;
 
@@ -63,7 +66,7 @@ self.addEventListener('fetch', function (event) {
     if (request.url.indexOf('/api/') !== -1) {
         event.respondWith(
             fetch(request).catch(function () {
-                return new Response(JSON.stringify({ error: true, mensaje: 'Sin conexión' }), {
+                return new Response(JSON.stringify({ error: true, mensaje: 'Sin conexion' }), {
                     headers: { 'Content-Type': 'application/json' }
                 });
             })
@@ -71,13 +74,30 @@ self.addEventListener('fetch', function (event) {
         return;
     }
 
-    // Assets: cache first, luego red
+    // HTML y JS: Network-first (siempre intentar actualizar)
+    if (request.url.indexOf('.html') !== -1 || request.url.indexOf('.js') !== -1) {
+        event.respondWith(
+            fetch(request).then(function (response) {
+                if (response && response.status === 200) {
+                    var responseToCache = response.clone();
+                    caches.open(CACHE_NAME).then(function (cache) {
+                        cache.put(request, responseToCache);
+                    });
+                }
+                return response;
+            }).catch(function () {
+                return caches.match(request);
+            })
+        );
+        return;
+    }
+
+    // Otros assets: Cache-first
     event.respondWith(
         caches.match(request).then(function (response) {
             if (response) return response;
 
             return fetch(request).then(function (response) {
-                // No cachear respuestas fallidas
                 if (!response || response.status !== 200) {
                     return response;
                 }

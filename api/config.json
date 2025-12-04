@@ -1,5 +1,6 @@
 {
     "ruta_pdf": "http://192.168.170.160/PDF-EXPGRIFERIA/",
     "ruta_csv": "../csv/0codigos.csv",
-    "timeout_segundos": 10
+    "timeout_segundos": 10,
+    "admin_password": "queija1234"
 }

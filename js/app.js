@@ -1,6 +1,6 @@
 /**
  * app.js - Scanner de codigos de barras
- * Con barra de estado visible y logging
+ * Con vibracion, beep, barra de estado y logging
  */
 
 // ============================================================================
@@ -47,14 +47,55 @@ var currentFacingMode = "environment";
 var lastScannedEAN = null;
 var lastScanTime = 0;
 
-var SCAN_COOLDOWN_MS = 3000;
+// Reducido de 3000 a 2000 para flujo mas rapido
+var SCAN_COOLDOWN_MS = 2000;
 var STORAGE_KEY = 'barcodeC_history';
 var MAX_HISTORY_ITEMS = 30;
 
-var beep = null;
-try {
-    beep = new Audio('data:audio/wav;base64,UklGRl9vT19XQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YU');
-} catch (e) { }
+// ============================================================================
+// AUDIO - Beep funcional
+// ============================================================================
+var audioContext = null;
+
+function initAudio() {
+    try {
+        audioContext = new (window.AudioContext || window.webkitAudioContext)();
+    } catch (e) {
+        console.log('Audio no disponible');
+    }
+}
+
+function playBeep() {
+    if (!audioContext) return;
+
+    try {
+        var oscillator = audioContext.createOscillator();
+        var gainNode = audioContext.createGain();
+
+        oscillator.connect(gainNode);
+        gainNode.connect(audioContext.destination);
+
+        oscillator.frequency.value = 1800;
+        oscillator.type = 'sine';
+
+        gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
+        gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.15);
+
+        oscillator.start(audioContext.currentTime);
+        oscillator.stop(audioContext.currentTime + 0.15);
+    } catch (e) { }
+}
+
+// ============================================================================
+// VIBRACION
+// ============================================================================
+function vibrate(pattern) {
+    if ('vibrate' in navigator) {
+        try {
+            navigator.vibrate(pattern);
+        } catch (e) { }
+    }
+}
 
 // ============================================================================
 // INICIALIZACION
@@ -62,11 +103,19 @@ try {
 document.addEventListener('DOMContentLoaded', function () {
     setStatus('Iniciando...', 'scanning');
     loadHistory();
+    initAudio();
 
     if (typeof Html5Qrcode === 'undefined') {
         setStatus('ERROR: Libreria no cargada', 'error');
         return;
     }
+
+    // Activar audio al primer toque (requerido por iOS/Android)
+    document.body.addEventListener('touchstart', function () {
+        if (audioContext && audioContext.state === 'suspended') {
+            audioContext.resume();
+        }
+    }, { once: true });
 
     setTimeout(function () {
         startScanner();
@@ -132,7 +181,7 @@ function startScanner() {
             return html5QrcodeScanner.start("user", config, onScanSuccess, function () { });
         });
     }).then(function () {
-        setStatus('Escaneando... apunta el codigo', 'success');
+        setStatus('Listo - Apunta el codigo', 'success');
         isCameraBusy = false;
     }).catch(function (err) {
         setStatus('ERROR camara: ' + (err.message || err), 'error');
@@ -191,9 +240,11 @@ function onScanSuccess(decodedText, decodedResult) {
     lastScannedEAN = decodedText;
     lastScanTime = now;
 
-    if (beep) try { beep.play(); } catch (e) { }
+    // Feedback inmediato: vibracion + beep
+    vibrate(200);
+    playBeep();
 
-    // Flash verde
+    // Flash verde visual
     var container = document.querySelector('.scanner-container');
     if (container) {
         container.style.borderColor = '#22c55e';
@@ -204,7 +255,7 @@ function onScanSuccess(decodedText, decodedResult) {
         }, 500);
     }
 
-    setStatus('Leido: ' + decodedText + ' - Buscando...', 'scanning');
+    setStatus('Buscando: ' + decodedText + '...', 'scanning');
 
     fetch('api/buscar.php?codigo=' + encodeURIComponent(decodedText))
         .then(function (response) { return response.json(); })
@@ -212,20 +263,23 @@ function onScanSuccess(decodedText, decodedResult) {
             if (data.encontrado) {
                 var desc = data.producto ? data.producto.descripcion : 'Encontrado';
                 setStatus('OK: ' + desc, 'success');
+                vibrate([100, 50, 100]); // Patron de exito
                 handleFound(data);
             } else {
                 setStatus('NO ENCONTRADO: ' + decodedText, 'error');
+                vibrate([50, 100, 50, 100, 50]); // Patron de error
                 handleNotFound(decodedText);
             }
         })
         .catch(function (error) {
             setStatus('ERROR: ' + error.message, 'error');
+            vibrate([300]); // Vibracion larga = error
             addToHistory(decodedText, 'Error: ' + error.message, null, false);
         })
         .finally(function () {
             setTimeout(function () {
                 isProcessing = false;
-                setStatus('Escaneando... apunta el codigo', 'success');
+                setStatus('Listo - Apunta el codigo', 'success');
             }, SCAN_COOLDOWN_MS);
         });
 }

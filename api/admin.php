@@ -7,7 +7,10 @@ session_start();
 header('Content-Type: application/json');
 
 $config_file = __DIR__ . '/config.json';
-$PASSWORD = 'queija1234';
+
+// Cargar config para obtener la contraseña
+$config_data = file_exists($config_file) ? json_decode(file_get_contents($config_file), true) : [];
+$PASSWORD = $config_data['admin_password'] ?? 'admin123'; // fallback por seguridad
 
 $action = $_POST['action'] ?? $_GET['action'] ?? '';
 
@@ -21,6 +24,8 @@ if ($action === 'login') {
         $_SESSION['auth'] = true;
         echo json_encode(['status' => 'ok', 'success' => true]);
     } else {
+        // Rate limiting básico
+        sleep(1);
         echo json_encode(['status' => 'error', 'success' => false, 'msg' => 'Contraseña incorrecta']);
     }
     exit;
