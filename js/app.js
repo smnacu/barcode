@@ -168,38 +168,19 @@ async function requestCameraPermission() {
             }
         }
 
-        console.log('🎯 Intentando getUserMedia con constraints:', { video: { facingMode: currentFacingMode } });
-        const constraints = { video: { facingMode: currentFacingMode } };
-        const stream = await navigator.mediaDevices.getUserMedia(constraints);
+        console.log('🎯 Solicitando inicio del escáner...');
 
-        // Permiso concedido: detener stream temporal y arrancar scanner
-        stream.getTracks().forEach(t => t.stop());
-        console.log('✅ Permiso de cámara concedido. Iniciando scanner...');
+        // No llamamos a getUserMedia aquí manualmente para evitar conflictos con la librería.
+        // Delegamos todo a startScanner().
 
         if (startScreen) startScreen.classList.add('hidden');
 
-        // Pequeño delay para asegurar que la cámara se liberó completamente
-        await new Promise(r => setTimeout(r, 500));
-
-        // Arrancar scanner (Html5Qrcode solicitará de nuevo acceso si fuese necesario)
         await startScanner();
 
     } catch (err) {
-        console.warn('⚠️ Error en requestCameraPermission:', {
-            name: err && err.name,
-            message: err && err.message,
-            code: err && err.code
-        });
-        if (startScreen) startScreen.classList.remove('hidden');
-        if (errorMsg) {
-            let msg = 'No se pudo acceder a la cámara.';
-            if (err && err.name === 'NotAllowedError') msg = 'Permiso denegado. Habilita la cámara en los ajustes del navegador.';
-            else if (err && err.name === 'NotFoundError') msg = 'No se encontró cámara en este dispositivo.';
-            else if (err && err.name === 'AbortError') msg = 'Solicitando permiso fue abortado.';
-            else if (err && err.message) msg = `Error: ${err.message}`;
-            errorMsg.innerText = msg;
-            errorMsg.classList.remove('hidden');
-        }
+        console.warn('⚠️ Error en requestCameraPermission:', err);
+        // Si falla algo previo, forzamos inicio para que startScanner maneje el error UI
+        await startScanner();
     }
 }
 
