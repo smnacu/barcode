@@ -1,77 +1,89 @@
 <?php
-// admin.php - Gestiona CSV, Configuración y SEGURIDAD
-session_start(); // Iniciamos sesión para guardar el estado del login
+/**
+ * admin.php - API de administración
+ * Gestiona configuración, CSVs y autenticación
+ */
+session_start();
 header('Content-Type: application/json');
 
 $config_file = __DIR__ . '/config.json';
-$PASSWORD = 'queija1234'; // La clave maestra
+$PASSWORD = 'queija1234';
 
-// Acciones que no requieren login
-$action = $_POST['action'] ?? '';
+$action = $_POST['action'] ?? $_GET['action'] ?? '';
 
-// 1. LOGIN
+// ============================================================================
+// ACCIONES PÚBLICAS (sin autenticación)
+// ============================================================================
+
 if ($action === 'login') {
     $pass = $_POST['password'] ?? '';
     if ($pass === $PASSWORD) {
         $_SESSION['auth'] = true;
         echo json_encode(['status' => 'ok', 'success' => true]);
     } else {
-        echo json_encode(['status' => 'error', 'message' => 'Contraseña incorrecta', 'success' => false, 'msg' => 'Contraseña incorrecta']);
+        echo json_encode(['status' => 'error', 'success' => false, 'msg' => 'Contraseña incorrecta']);
     }
     exit;
 }
 
-// 2. CHECK LOGIN (Para verificar al cargar la página)
 if ($action === 'check_auth') {
     $logged = isset($_SESSION['auth']) && $_SESSION['auth'] === true;
     echo json_encode(['auth' => $logged, 'logged_in' => $logged]);
     exit;
 }
 
-// 3. LOGOUT
 if ($action === 'logout') {
     session_destroy();
     echo json_encode(['status' => 'ok', 'success' => true]);
     exit;
 }
 
-// --- ZONA PROTEGIDA ---
-// Si no está logueado, cortamos acá.
+// ============================================================================
+// ZONA PROTEGIDA
+// ============================================================================
+
 if (!isset($_SESSION['auth']) || $_SESSION['auth'] !== true) {
-    http_response_code(401); // Changed to 401 for frontend handling
+    http_response_code(401);
     echo json_encode(['status' => 'error', 'message' => 'No autorizado']);
     exit;
 }
 
-// Funciones Helper
+// ============================================================================
+// FUNCIONES HELPER
+// ============================================================================
+
 function loadConfig() {
     global $config_file;
+    $defaults = [
+        'ruta_pdf' => 'http://192.168.170.160/PDF-EXPGRIFERIA/',
+        'ruta_csv' => '../csv/0codigos.csv',
+        'timeout_segundos' => 10
+    ];
+    
     if (file_exists($config_file)) {
-        return json_decode(file_get_contents($config_file), true);
+        $loaded = json_decode(file_get_contents($config_file), true);
+        if ($loaded) return array_merge($defaults, $loaded);
     }
-    // Valores por defecto con claves correctas que JS espera
-    return ['pdf_path' => '../Pdf/', 'active_csv' => '0codigos.csv'];
+    return $defaults;
 }
 
 function saveConfig($data) {
     global $config_file;
-    file_put_contents($config_file, json_encode($data, JSON_PRETTY_PRINT));
+    file_put_contents($config_file, json_encode($data, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
 }
 
 function readCSV($filename) {
-    $rows = [];
-    // Handle both full path or just filename
     $path = $filename;
     if (strpos($path, '/') === false && strpos($path, '\\') === false) {
         $path = "../csv/" . $filename;
     }
-    // Resolve absolute path if needed
     if (!file_exists($path) && file_exists(__DIR__ . '/' . $path)) {
         $path = __DIR__ . '/' . $path;
     }
     
+    $rows = [];
     if (file_exists($path) && ($handle = fopen($path, "r")) !== FALSE) {
-        while (($data = fgetcsv($handle, 1000, ";")) !== FALSE) { // Changed delimiter to semicolon
+        while (($data = fgetcsv($handle, 1000, ";")) !== FALSE) {
             $rows[] = $data;
         }
         fclose($handle);
@@ -82,16 +94,12 @@ function readCSV($filename) {
 function writeCSV($filename, $data) {
     $path = $filename;
     if (strpos($path, '/') === false && strpos($path, '\\') === false) {
-        $path = "../csv/" . $filename;
-    }
-    if (!file_exists(dirname($path))) {
-        // Try to use __DIR__ relative
         $path = __DIR__ . '/../csv/' . $filename;
     }
 
     if ($fp = fopen($path, 'w')) {
         foreach ($data as $fields) {
-            fputcsv($fp, $fields, ";"); // Changed delimiter to semicolon
+            fputcsv($fp, $fields, ";");
         }
         fclose($fp);
         return true;
@@ -99,45 +107,102 @@ function writeCSV($filename, $data) {
     return false;
 }
 
-// Cargar configuración actual
+function getCsvFiles() {
+    $files = [];
+    $csv_dir = __DIR__ . '/../csv/';
+    if (is_dir($csv_dir)) {
+        foreach (scandir($csv_dir) as $f) {
+            if ($f !== '.' && $f !== '..' && pathinfo($f, PATHINFO_EXTENSION) === 'csv') {
+                $files[] = $f;
+            }
+        }
+    }
+    sort($files);
+    return $files;
+}
+
+// ============================================================================
+// HANDLER DE ACCIONES
+// ============================================================================
+
 $config = loadConfig();
-// Si viene un archivo específico en el POST (para editar uno que no es el activo), lo usamos
 $target_csv = $_POST['target_csv'] ?? basename($config['ruta_csv']);
 
 switch ($action) {
     case 'get_config':
-        // Escaneamos la carpeta CSV real en el servidor
-        $csv_files = [];
-        $csv_dir = __DIR__ . '/../csv/';
-        if (is_dir($csv_dir)) {
-            $files = scandir($csv_dir);
-            foreach($files as $f) {
-                if($f !== '.' && $f !== '..' && strpos($f, '.csv') !== false) {
-                    $csv_files[] = $f;
-                }
-            }
-        }
-        sort($csv_files); // Ordenar alfabéticamente para consistencia
-        
-        // Asegurar que config tiene las claves correctas que JS espera
-        if (!isset($config['pdf_path'])) $config['pdf_path'] = '../Pdf/';
-        if (!isset($config['active_csv'])) $config['active_csv'] = isset($csv_files[0]) ? $csv_files[0] : '0codigos.csv';
-        
-        echo json_encode(['config' => $config, 'csv_files' => $csv_files]);
+        $csv_files = getCsvFiles();
+        // Mapear para compatibilidad con admin.html
+        echo json_encode([
+            'config' => [
+                'pdf_path' => $config['ruta_pdf'],
+                'active_csv' => basename($config['ruta_csv']),
+                'ruta_pdf' => $config['ruta_pdf'],
+                'ruta_csv' => $config['ruta_csv'],
+                'timeout_segundos' => $config['timeout_segundos']
+            ],
+            'csv_files' => $csv_files
+        ]);
         break;
 
     case 'save_config':
         $new_config = [
-            'pdf_path' => $_POST['pdf_path'] ?? '../Pdf/',
-            'active_csv' => $_POST['active_csv'] ?? '0codigos.csv'
+            'ruta_pdf' => $_POST['pdf_path'] ?? $config['ruta_pdf'],
+            'ruta_csv' => '../csv/' . ($_POST['active_csv'] ?? basename($config['ruta_csv'])),
+            'timeout_segundos' => (int)($config['timeout_segundos'] ?? 10)
         ];
         saveConfig($new_config);
-        echo json_encode(['status' => 'ok', 'success' => true, 'msg' => 'Configuración guardada', 'config' => $new_config]);
+        echo json_encode(['status' => 'ok', 'success' => true, 'msg' => 'Configuración guardada']);
+        break;
+
+    case 'test_path':
+        $path = $_POST['path'] ?? '';
+        $type = $_POST['type'] ?? 'dir';
+        
+        // Si es HTTP, verificar conexión
+        if (preg_match('/^https?:\/\//i', $path)) {
+            $headers = @get_headers($path);
+            $exists = $headers && strpos($headers[0], '200') !== false;
+            echo json_encode([
+                'success' => $exists,
+                'msg' => $exists ? 'Servidor accesible' : 'No se puede acceder al servidor'
+            ]);
+        } else {
+            // Ruta local
+            $exists = ($type === 'file') ? file_exists($path) : is_dir($path);
+            echo json_encode([
+                'success' => $exists,
+                'msg' => $exists ? 'Ruta válida' : 'Ruta no encontrada'
+            ]);
+        }
+        break;
+
+    case 'list_csvs':
+        echo json_encode(['success' => true, 'files' => getCsvFiles()]);
+        break;
+
+    case 'get_csv_content':
+        $filename = basename($_GET['filename'] ?? '');
+        $path = __DIR__ . '/../csv/' . $filename;
+        if (file_exists($path)) {
+            echo json_encode(['success' => true, 'content' => file_get_contents($path)]);
+        } else {
+            echo json_encode(['success' => false, 'msg' => 'Archivo no encontrado']);
+        }
+        break;
+
+    case 'save_csv_content':
+        $filename = basename($_POST['filename'] ?? '');
+        $content = $_POST['content'] ?? '';
+        $path = __DIR__ . '/../csv/' . $filename;
+        if (file_put_contents($path, $content) !== false) {
+            echo json_encode(['success' => true, 'msg' => 'Guardado correctamente']);
+        } else {
+            echo json_encode(['success' => false, 'msg' => 'Error al guardar']);
+        }
         break;
 
     case 'get_data':
-        $data = readCSV($target_csv);
-        echo json_encode(['data' => $data, 'file' => $target_csv]);
+        echo json_encode(['data' => readCSV($target_csv), 'file' => $target_csv]);
         break;
 
     case 'update_row':
@@ -155,21 +220,18 @@ switch ($action) {
         break;
 
     case 'add_row':
-        $newData = $_POST['row_data'];
         $allData = readCSV($target_csv);
-        $allData[] = $newData;
+        $allData[] = $_POST['row_data'];
         writeCSV($target_csv, $allData);
         echo json_encode(['status' => 'ok']);
         break;
 
     case 'add_row_top':
-        $newData = $_POST['row_data'];
         $allData = readCSV($target_csv);
-        // Insertar después del header (índice 1)
         if (count($allData) > 0) {
-            array_splice($allData, 1, 0, [$newData]);
+            array_splice($allData, 1, 0, [$_POST['row_data']]);
         } else {
-            $allData[] = $newData;
+            $allData[] = $_POST['row_data'];
         }
         writeCSV($target_csv, $allData);
         echo json_encode(['status' => 'ok']);
@@ -188,18 +250,21 @@ switch ($action) {
         break;
 
     case 'upload_csv':
-        if (isset($_FILES['file'])) {
-            $target = "../csv/" . basename($_FILES['file']['name']);
-            if (move_uploaded_file($_FILES['file']['tmp_name'], $target)) {
-                echo json_encode(['status' => 'ok', 'filename' => basename($_FILES['file']['name'])]);
+        if (isset($_FILES['file']) || isset($_FILES['archivo_csv'])) {
+            $file = $_FILES['file'] ?? $_FILES['archivo_csv'];
+            $target = __DIR__ . "/../csv/" . basename($file['name']);
+            if (move_uploaded_file($file['tmp_name'], $target)) {
+                echo json_encode(['status' => 'ok', 'success' => true, 'msg' => 'Archivo subido', 'filename' => basename($file['name'])]);
             } else {
-                echo json_encode(['status' => 'error', 'message' => 'Fallo al subir']);
+                echo json_encode(['status' => 'error', 'success' => false, 'msg' => 'Error al subir archivo']);
             }
+        } else {
+            echo json_encode(['status' => 'error', 'success' => false, 'msg' => 'No se recibió archivo']);
         }
         break;
 
     default:
-        echo json_encode(['status' => 'error', 'message' => 'Accion no valida']);
+        echo json_encode(['status' => 'error', 'message' => 'Acción no válida']);
         break;
 }
 ?>

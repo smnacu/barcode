@@ -1,171 +1,184 @@
+/**
+ * app.js - Scanner de códigos de barras
+ * Optimizado para Android 11 de bajos recursos
+ */
+
 // ============================================================================
-// CONFIGURACIÓN Y VARIABLES
+// CONFIGURACIÓN
 // ============================================================================
-let html5QrcodeScanner = null;
-let isProcessing = false;
-let isCameraBusy = false; // Mutex para evitar condiciones de carrera
-let currentFacingMode = "environment"; // Default: Trasera
-let lastScannedEAN = null;
-let lastScanTime = 0;
-const SCAN_COOLDOWN_MS = 3000;
-const STORAGE_KEY = 'barcodeC_history';
-const MAX_HISTORY_ITEMS = 30;
-const beep = new Audio('data:audio/wav;base64,UklGRl9vT19XQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YU');
+var html5QrcodeScanner = null;
+var isProcessing = false;
+var isCameraBusy = false;
+var currentFacingMode = "environment";
+var lastScannedEAN = null;
+var lastScanTime = 0;
+
+var SCAN_COOLDOWN_MS = 3000;
+var STORAGE_KEY = 'barcodeC_history';
+var MAX_HISTORY_ITEMS = 30;
+
+// Audio beep simple
+var beep = null;
+try {
+    beep = new Audio('data:audio/wav;base64,UklGRl9vT19XQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YU');
+} catch (e) { }
 
 // ============================================================================
 // INICIALIZACIÓN
 // ============================================================================
-document.addEventListener('DOMContentLoaded', () => {
-    ensureAndroidCompatibility();
+document.addEventListener('DOMContentLoaded', function () {
     loadHistory();
-    startScanner(); // Auto-start
+    startScanner();
 });
 
-function ensureAndroidCompatibility() {
-    const viewport = document.querySelector('meta[name="viewport"]');
-    if (viewport) {
-        viewport.setAttribute('content', 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover');
-    }
-}
-
 // ============================================================================
-// LÓGICA DEL ESCÁNER
+// SCANNER
 // ============================================================================
-async function startScanner() {
-    // Evitar re-entrada si ya estamos iniciando/deteniendo
+function startScanner() {
     if (isCameraBusy) return;
     isCameraBusy = true;
 
-    const errorMsg = document.getElementById('error-msg');
-    if (errorMsg) errorMsg.classList.add('hidden');
+    var errorMsg = document.getElementById('error-msg');
+    if (errorMsg) errorMsg.classList.remove('visible');
 
-    try {
-        // Limpieza robusta de instancia previa
-        if (html5QrcodeScanner) {
-            try {
-                // Solo intentar detener si está escaneando o pausado
-                if (html5QrcodeScanner.getState() === Html5QrcodeScannerState.SCANNING ||
-                    html5QrcodeScanner.getState() === Html5QrcodeScannerState.PAUSED) {
-                    await html5QrcodeScanner.stop();
-                }
-                html5QrcodeScanner.clear();
-            } catch (e) {
-                console.warn("Error stopping/clearing scanner:", e);
-            }
-            html5QrcodeScanner = null;
-        }
+    // Limpiar instancia previa
+    var cleanup = Promise.resolve();
+    if (html5QrcodeScanner) {
+        cleanup = stopCurrentScanner();
+    }
 
-        // Pequeña pausa para asegurar que el DOM y la cámara se liberen
-        await new Promise(r => setTimeout(r, 100));
-
-        const reader = document.getElementById('reader');
+    cleanup.then(function () {
+        return new Promise(function (resolve) { setTimeout(resolve, 150); });
+    }).then(function () {
+        var reader = document.getElementById('reader');
         if (reader) reader.innerHTML = '';
 
         html5QrcodeScanner = new Html5Qrcode("reader");
 
-        const config = {
-            fps: 10,
-            qrbox: { width: 200, height: 200 },
+        // Config optimizada para Android bajo recursos
+        var config = {
+            fps: 5,  // Reducido de 10 para menos uso de CPU
+            qrbox: { width: 180, height: 180 },
             aspectRatio: 1.0,
             disableFlip: false,
             formatsToSupport: [
                 Html5QrcodeSupportedFormats.QR_CODE,
                 Html5QrcodeSupportedFormats.CODE_128,
-                Html5QrcodeSupportedFormats.EAN_13
+                Html5QrcodeSupportedFormats.EAN_13,
+                Html5QrcodeSupportedFormats.EAN_8
             ]
         };
 
-        const constraints = {
+        var constraints = {
             facingMode: currentFacingMode,
-            width: { ideal: 640 },
+            width: { ideal: 480 },  // Reducido de 640
             height: { ideal: 480 }
         };
 
-        try {
-            await html5QrcodeScanner.start(constraints, config, onScanSuccess, () => { });
-        } catch (err) {
-            console.warn('Primary start failed, trying fallback video mode', err);
-            await html5QrcodeScanner.start({ video: true }, config, onScanSuccess, () => { });
-        }
-
-    } catch (err) {
-        console.error("Error cámara:", err);
-        if (errorMsg) {
-            // Ignorar error "already under transition" si ocurre a pesar del bloqueo
-            if (!err.message?.includes("already under transition")) {
-                errorMsg.innerText = 'Error: ' + (err.message || err);
-                errorMsg.classList.remove('hidden');
-            }
-        }
-    } finally {
+        return html5QrcodeScanner.start(constraints, config, onScanSuccess, function () { })
+            .catch(function (err) {
+                console.warn('Fallback to basic video mode', err);
+                return html5QrcodeScanner.start({ video: true }, config, onScanSuccess, function () { });
+            });
+    }).then(function () {
         isCameraBusy = false;
+    }).catch(function (err) {
+        console.error("Error cámara:", err);
+        isCameraBusy = false;
+        if (errorMsg && err.message && err.message.indexOf('already under transition') === -1) {
+            errorMsg.textContent = 'Error: ' + err.message;
+            errorMsg.classList.add('visible');
+        }
+    });
+}
+
+function stopCurrentScanner() {
+    if (!html5QrcodeScanner) return Promise.resolve();
+
+    try {
+        var state = html5QrcodeScanner.getState();
+        if (state === Html5QrcodeScannerState.SCANNING || state === Html5QrcodeScannerState.PAUSED) {
+            return html5QrcodeScanner.stop().then(function () {
+                html5QrcodeScanner.clear();
+                html5QrcodeScanner = null;
+            });
+        }
+        html5QrcodeScanner.clear();
+        html5QrcodeScanner = null;
+    } catch (e) {
+        console.warn("Error stopping scanner:", e);
+        html5QrcodeScanner = null;
     }
+    return Promise.resolve();
 }
 
-async function switchCamera() {
+function switchCamera() {
     if (isCameraBusy) return;
-
-    const btnIcon = document.querySelector('button[onclick="switchCamera()"] i');
-    if (btnIcon) btnIcon.classList.add('animate-spin');
-
     currentFacingMode = (currentFacingMode === "user") ? "environment" : "user";
-
-    await startScanner();
-
-    if (btnIcon) setTimeout(() => btnIcon.classList.remove('animate-spin'), 500);
+    startScanner();
 }
 
-async function onScanSuccess(decodedText) {
-    const now = Date.now();
+function onScanSuccess(decodedText) {
+    var now = Date.now();
     if (decodedText === lastScannedEAN && (now - lastScanTime) < SCAN_COOLDOWN_MS) return;
     if (isProcessing) return;
 
     isProcessing = true;
     lastScannedEAN = decodedText;
     lastScanTime = now;
-    beep.play().catch(() => { });
 
+    if (beep) try { beep.play(); } catch (e) { }
     showStatus(true);
 
-    try {
-        const response = await fetch(`api/buscar.php?codigo=${encodeURIComponent(decodedText)}`);
-        const data = await response.json();
-
-        if (data.encontrado) {
-            handleFound(data);
-        } else {
-            handleNotFound(decodedText);
-        }
-    } catch (error) {
-        addToHistory(decodedText, `Error: ${error.message}`, null, false);
-    } finally {
-        setTimeout(() => {
-            isProcessing = false;
-            showStatus(false);
-        }, SCAN_COOLDOWN_MS);
-    }
+    fetch('api/buscar.php?codigo=' + encodeURIComponent(decodedText))
+        .then(function (response) { return response.json(); })
+        .then(function (data) {
+            if (data.encontrado) {
+                handleFound(data);
+            } else {
+                handleNotFound(decodedText);
+            }
+        })
+        .catch(function (error) {
+            addToHistory(decodedText, 'Error: ' + error.message, null, false);
+        })
+        .finally(function () {
+            setTimeout(function () {
+                isProcessing = false;
+                showStatus(false);
+            }, SCAN_COOLDOWN_MS);
+        });
 }
 
 function showStatus(processing) {
-    const badge = document.getElementById('scan-status');
+    var badge = document.getElementById('scan-status');
     if (!badge) return;
     if (processing) {
-        badge.classList.remove('hidden');
+        badge.classList.add('active');
     } else {
-        badge.classList.add('hidden');
+        badge.classList.remove('active');
     }
 }
 
 function handleFound(data) {
-    let fullUrl = data.pdf_url;
+    var fullUrl = data.pdf_url;
     if (!fullUrl && data.pdf) {
-        fullUrl = data.pdf.startsWith('http') ? data.pdf : 'api/ver_pdf.php?file=' + encodeURIComponent(data.pdf);
+        // Si es URL HTTP, usar directamente
+        if (data.pdf.indexOf('http') === 0) {
+            fullUrl = data.pdf;
+        } else {
+            fullUrl = 'api/ver_pdf.php?file=' + encodeURIComponent(data.pdf);
+        }
     }
-    const title = data.producto.descripcion || 'Producto encontrado';
-    const code = data.producto.ean || data.producto.codigo;
+
+    var title = (data.producto && data.producto.descripcion) ? data.producto.descripcion : 'Producto encontrado';
+    var code = (data.producto && (data.producto.ean || data.producto.codigo)) || '';
 
     addToHistory(code, title, fullUrl, true);
-    if (fullUrl) window.open(fullUrl, '_blank');
+
+    if (fullUrl) {
+        window.open(fullUrl, '_blank');
+    }
 }
 
 function handleNotFound(code) {
@@ -177,69 +190,94 @@ function handleNotFound(code) {
 // ============================================================================
 function loadHistory() {
     try {
-        const stored = localStorage.getItem(STORAGE_KEY);
-        const items = stored ? JSON.parse(stored) : [];
-        const list = document.getElementById('history-list');
+        var stored = localStorage.getItem(STORAGE_KEY);
+        var items = stored ? JSON.parse(stored) : [];
+        var list = document.getElementById('history-list');
         if (list) {
-            list.innerHTML = '';
-            items.forEach(item => renderHistoryItem(list, item));
+            if (items.length === 0) {
+                list.innerHTML = '<div class="empty-history">Sin escaneos recientes</div>';
+            } else {
+                list.innerHTML = '';
+                items.forEach(function (item) { renderHistoryItem(list, item); });
+            }
         }
     } catch (e) { }
 }
 
 function addToHistory(ean, desc, url, success) {
-    const list = document.getElementById('history-list');
+    var list = document.getElementById('history-list');
     if (!list) return;
 
-    const newItem = { ean, desc, url, success, timestamp: new Date().toISOString() };
+    // Limpiar mensaje de vacío si existe
+    var empty = list.querySelector('.empty-history');
+    if (empty) empty.remove();
+
+    var newItem = {
+        ean: ean,
+        desc: desc,
+        url: url,
+        success: success,
+        timestamp: new Date().toISOString()
+    };
     renderHistoryItem(list, newItem, true);
 
     try {
-        const stored = localStorage.getItem(STORAGE_KEY);
-        const existing = stored ? JSON.parse(stored) : [];
-        const updated = [newItem, ...existing].slice(0, MAX_HISTORY_ITEMS);
+        var stored = localStorage.getItem(STORAGE_KEY);
+        var existing = stored ? JSON.parse(stored) : [];
+        var updated = [newItem].concat(existing).slice(0, MAX_HISTORY_ITEMS);
         localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
     } catch (e) { }
 }
 
-function renderHistoryItem(list, item, prepend = false) {
-    const el = document.createElement('div');
-    const colorClass = item.success ? "bg-green-500" : "bg-red-500";
-    const actionBtn = (item.success && item.url) ?
-        `<a href="${item.url}" target="_blank" class="bg-blue-600 hover:bg-blue-500 text-white px-3 py-1.5 rounded text-[10px] font-bold uppercase tracking-wider shadow-lg flex items-center gap-1">ABRIR <i class="ph-bold ph-arrow-square-out"></i></a>` :
-        ``;
+function renderHistoryItem(list, item, prepend) {
+    var el = document.createElement('div');
+    el.className = 'history-item ' + (item.success ? 'success' : 'error');
 
-    el.className = "bg-gray-800/50 border border-gray-700/50 rounded-lg p-3 flex justify-between items-center relative overflow-hidden group";
-    el.innerHTML = `
-        <div class="absolute left-0 top-0 bottom-0 w-1 ${colorClass}"></div>
-        <div class="flex flex-col pl-2 overflow-hidden mr-2">
-            <span class="text-[10px] text-gray-500 font-mono uppercase">${item.ean}</span>
-            <span class="text-xs font-medium text-gray-200 truncate">${item.desc}</span>
-        </div>
-        <div class="shrink-0">${actionBtn}</div>
-    `;
+    var actionBtn = '';
+    if (item.success && item.url) {
+        actionBtn = '<a href="' + item.url + '" target="_blank" class="open-pdf-btn">ABRIR ↗</a>';
+    }
 
-    if (prepend) list.insertBefore(el, list.firstChild);
-    else list.appendChild(el);
+    el.innerHTML =
+        '<div class="history-item-info">' +
+        '<div class="history-item-code">' + escapeHtml(item.ean) + '</div>' +
+        '<div class="history-item-desc">' + escapeHtml(item.desc) + '</div>' +
+        '</div>' +
+        '<div>' + actionBtn + '</div>';
+
+    if (prepend) {
+        list.insertBefore(el, list.firstChild);
+    } else {
+        list.appendChild(el);
+    }
 }
 
 function clearHistory() {
     localStorage.removeItem(STORAGE_KEY);
-    const list = document.getElementById('history-list');
-    if (list) list.innerHTML = '';
+    var list = document.getElementById('history-list');
+    if (list) {
+        list.innerHTML = '<div class="empty-history">Sin escaneos recientes</div>';
+    }
+}
+
+function escapeHtml(text) {
+    if (!text) return '';
+    var div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
 }
 
 // ============================================================================
 // BÚSQUEDA MANUAL
 // ============================================================================
-const searchInput = document.getElementById('manual-search');
-const searchResults = document.getElementById('search-results');
-const resultsList = document.getElementById('results-list');
-let searchTimeout = null;
+var searchInput = document.getElementById('manual-search');
+var searchResults = document.getElementById('search-results');
+var resultsList = document.getElementById('results-list');
+var searchTimeout = null;
 
 if (searchInput) {
-    searchInput.addEventListener('input', (e) => {
-        const query = e.target.value.trim();
+    searchInput.addEventListener('input', function (e) {
+        var query = e.target.value.trim();
         clearTimeout(searchTimeout);
 
         if (query.length < 2) {
@@ -247,26 +285,24 @@ if (searchInput) {
             return;
         }
 
-        searchTimeout = setTimeout(() => performManualSearch(query), 400);
+        searchTimeout = setTimeout(function () { performManualSearch(query); }, 400);
     });
 }
 
 function closeSearch() {
-    if (searchResults) searchResults.classList.add('hidden');
+    if (searchResults) searchResults.classList.remove('visible');
+    if (searchInput) searchInput.value = '';
 }
 
-async function performManualSearch(query) {
-    try {
-        const fd = new FormData();
-        fd.append('codigo', query);
-        fd.append('modo', 'lista');
+function performManualSearch(query) {
+    var fd = new FormData();
+    fd.append('codigo', query);
+    fd.append('modo', 'lista');
 
-        const res = await fetch('api/buscar.php', { method: 'POST', body: fd });
-        const data = await res.json();
-        renderSearchResults(data);
-    } catch (err) {
-        console.error(err);
-    }
+    fetch('api/buscar.php', { method: 'POST', body: fd })
+        .then(function (res) { return res.json(); })
+        .then(function (data) { renderSearchResults(data); })
+        .catch(function (err) { console.error(err); });
 }
 
 function renderSearchResults(data) {
@@ -274,28 +310,24 @@ function renderSearchResults(data) {
     resultsList.innerHTML = '';
 
     if (!data.encontrado || !data.resultados || data.resultados.length === 0) {
-        resultsList.innerHTML = '<div class="text-gray-500 text-xs text-center p-3">Sin resultados</div>';
-        if (searchResults) searchResults.classList.remove('hidden');
+        resultsList.innerHTML = '<div class="result-item"><span class="result-item-title">Sin resultados</span></div>';
+        if (searchResults) searchResults.classList.add('visible');
         return;
     }
 
-    data.resultados.forEach(item => {
-        const el = document.createElement('div');
-        el.className = 'p-3 border-b border-gray-800 hover:bg-white/5 cursor-pointer flex flex-col gap-0.5 transition-colors';
-        el.innerHTML = `
-            <div class="flex justify-between items-start">
-                <span class="font-medium text-gray-200 text-xs">${item.descripcion}</span>
-                <span class="text-[10px] bg-gray-800 text-gray-400 px-1.5 rounded border border-gray-700">${item.codigo}</span>
-            </div>
-            <span class="text-[10px] text-gray-500">EAN: ${item.ean}</span>
-        `;
-        el.onclick = () => {
+    data.resultados.forEach(function (item) {
+        var el = document.createElement('div');
+        el.className = 'result-item';
+        el.innerHTML =
+            '<div class="result-item-title">' + escapeHtml(item.descripcion) + '</div>' +
+            '<div class="result-item-code">Código: ' + escapeHtml(item.codigo) + ' | EAN: ' + escapeHtml(item.ean) + '</div>';
+
+        el.onclick = function () {
             onScanSuccess(item.codigo);
             closeSearch();
-            if (searchInput) searchInput.value = '';
         };
         resultsList.appendChild(el);
     });
 
-    if (searchResults) searchResults.classList.remove('hidden');
+    if (searchResults) searchResults.classList.add('visible');
 }

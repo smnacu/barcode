@@ -1,6 +1,11 @@
 <?php
+/**
+ * buscar.php - API de búsqueda de productos
+ * Busca en CSV y retorna información del producto + ruta PDF
+ */
 header('Content-Type: application/json; charset=utf-8');
 
+// Cargar configuración
 $configFile = __DIR__ . '/config.json';
 $config = [
     'ruta_csv' => '../csv/Libro.csv',
@@ -12,6 +17,9 @@ if (file_exists($configFile)) {
     if ($loaded) $config = array_merge($config, $loaded);
 }
 
+/**
+ * Limpia strings de caracteres especiales y BOM
+ */
 function limpiarString($texto) {
     if ($texto === null) return null;
     $texto = trim($texto);
@@ -20,40 +28,9 @@ function limpiarString($texto) {
     return $texto;
 }
 
-function simpleJsonEncode($data) {
-    if (is_array($data)) {
-        $parts = [];
-        $isList = array_keys($data) === range(0, count($data) - 1);
-        foreach ($data as $key => $value) {
-            $part = $isList ? '' : '"' . addslashes($key) . '":';
-            if (is_array($value)) $part .= simpleJsonEncode($value);
-            elseif (is_bool($value)) $part .= ($value ? 'true' : 'false');
-            elseif (is_numeric($value) && !is_string($value)) $part .= $value;
-            elseif ($value === null) $part .= 'null';
-            else $part .= '"' . addslashes((string)$value) . '"';
-            $parts[] = $part;
-<?php
-header('Content-Type: application/json; charset=utf-8');
-
-$configFile = __DIR__ . '/config.json';
-$config = [
-    'ruta_csv' => '../csv/Libro.csv',
-    'ruta_pdf' => '../Pdf/'
-];
-
-if (file_exists($configFile)) {
-    $loaded = json_decode(file_get_contents($configFile), true);
-    if ($loaded) $config = array_merge($config, $loaded);
-}
-
-function limpiarString($texto) {
-    if ($texto === null) return null;
-    $texto = trim($texto);
-    $texto = str_replace(["\xC2\xA0", "\xA0"], '', $texto);
-    $texto = preg_replace('/^\x{FEFF}/u', '', $texto);
-    return $texto;
-}
-
+/**
+ * Codifica array a JSON de forma segura (compatibilidad PHP antiguo)
+ */
 function simpleJsonEncode($data) {
     if (is_array($data)) {
         $parts = [];
@@ -72,17 +49,17 @@ function simpleJsonEncode($data) {
     return '"' . addslashes((string)$data) . '"';
 }
 
+/**
+ * Busca producto en archivo CSV
+ */
 function buscarEnLibro($codigo, $config, $modo = 'unico') {
     $csv_path = $config['ruta_csv'];
     
-    // 1. Try exact path
+    // Intentar diferentes rutas para encontrar el CSV
     if (!file_exists($csv_path)) {
-        // 2. Try relative to __DIR__
         if (file_exists(__DIR__ . '/' . $csv_path)) {
             $csv_path = __DIR__ . '/' . $csv_path;
-        }
-        // 3. Try in ../csv/ folder if it's just a filename
-        elseif (file_exists(__DIR__ . '/../csv/' . basename($csv_path))) {
+        } elseif (file_exists(__DIR__ . '/../csv/' . basename($csv_path))) {
             $csv_path = __DIR__ . '/../csv/' . basename($csv_path);
         }
     }
@@ -107,7 +84,7 @@ function buscarEnLibro($codigo, $config, $modo = 'unico') {
             $eanNorm = mb_strtolower($ean, 'UTF-8');
             $descNorm = mb_strtolower($descripcion, 'UTF-8');
 
-            // Búsqueda flexible: Coincidencia parcial en cualquiera de los 3 campos
+            // Búsqueda flexible en cualquier campo
             if (strpos($codArtNorm, $codigo) !== false || 
                 strpos($eanNorm, $codigo) !== false || 
                 strpos($descNorm, $codigo) !== false) {
@@ -115,8 +92,7 @@ function buscarEnLibro($codigo, $config, $modo = 'unico') {
                 $item = ['codigo' => $codArt, 'descripcion' => $descripcion, 'ean' => $ean];
                 
                 if ($modo === 'unico') {
-                    // Comportamiento original: Retorna el primero exacto o el primero parcial si no hay exacto
-                    // Priorizar coincidencia exacta de EAN o Código
+                    // Priorizar coincidencia exacta
                     if ($codArtNorm === $codigo || $eanNorm === $codigo) {
                         fclose($handle);
                         return [
@@ -125,12 +101,10 @@ function buscarEnLibro($codigo, $config, $modo = 'unico') {
                             'fuente' => basename($csv_path)
                         ];
                     }
-                    // Si es parcial, lo guardamos como candidato pero seguimos buscando un exacto
                     if (empty($resultados)) $resultados[] = $item;
                 } else {
-                    // Modo lista: Acumular todos
                     $resultados[] = $item;
-                    if (count($resultados) >= 50) break; // Límite de seguridad
+                    if (count($resultados) >= 50) break;
                 }
             }
         }
@@ -149,6 +123,62 @@ function buscarEnLibro($codigo, $config, $modo = 'unico') {
     } else {
         return [
             'encontrado' => count($resultados) > 0,
+            'resultados' => $resultados
+        ];
+    }
+}
+
+/**
+ * Busca el archivo PDF correspondiente al producto
+ */
+function buscarPDF($producto, $config) {
+    $ruta_base = $config['ruta_pdf'];
+    $codigo = $producto['codigo'];
+    
+    // Si la ruta es HTTP, construir URL directa
+    if (preg_match('/^https?:\/\//i', $ruta_base)) {
+        $ruta_base = rtrim($ruta_base, '/') . '/';
+        // Intentar diferentes extensiones y formatos de nombre
+        $variantes = [
+            $codigo . '.pdf',
+            strtoupper($codigo) . '.pdf',
+            strtolower($codigo) . '.pdf'
+        ];
+        // Para URLs HTTP, retornamos la primera variante
+        // El servidor LAN manejará si existe o no
+        return $ruta_base . $codigo . '.pdf';
+    }
+    
+    // Si es ruta local
+    if (!file_exists($ruta_base) && file_exists(__DIR__ . '/' . $ruta_base)) {
+        $ruta_base = __DIR__ . '/' . $ruta_base;
+    }
+    $ruta_base = rtrim($ruta_base, '/\\') . DIRECTORY_SEPARATOR;
+    
+    // Buscar archivo con diferentes variantes
+    $variantes = [
+        $codigo . '.pdf',
+        strtoupper($codigo) . '.pdf',
+        strtolower($codigo) . '.pdf'
+    ];
+    
+    foreach ($variantes as $nombre) {
+        if (file_exists($ruta_base . $nombre)) {
+            return $nombre;
+        }
+    }
+    
+    return null;
+}
+
+// ============================================================================
+// PUNTO DE ENTRADA PRINCIPAL
+// ============================================================================
+
+$codigo = $_GET['codigo'] ?? $_POST['codigo'] ?? null;
+$modo = $_POST['modo'] ?? 'unico';
+
+if (empty($codigo)) {
     http_response_code(400);
     echo simpleJsonEncode(['error' => true, 'mensaje' => 'Codigo requerido']);
     exit;
@@ -157,7 +187,6 @@ function buscarEnLibro($codigo, $config, $modo = 'unico') {
 $res = buscarEnLibro($codigo, $config, $modo);
 
 if ($modo === 'lista') {
-    // En modo lista, retornamos array de resultados sin buscar PDF individualmente aún
     echo simpleJsonEncode([
         'error' => false,
         'encontrado' => $res['encontrado'],
@@ -165,7 +194,6 @@ if ($modo === 'lista') {
         'count' => count($res['resultados'] ?? [])
     ]);
 } else {
-    // Modo único (original)
     if ($res['encontrado']) {
         $pdf = buscarPDF($res['producto'], $config);
         
@@ -174,9 +202,11 @@ if ($modo === 'lista') {
         
         if ($pdf) {
             $pdf_available = true;
+            // Si la ruta PDF es HTTP (servidor LAN), usar directamente
             if (preg_match('/^https?:\/\//i', $pdf)) {
                 $pdf_url = $pdf;
             } else {
+                // Ruta local, usar ver_pdf.php
                 $pdf_url = 'api/ver_pdf.php?file=' . urlencode($pdf);
             }
         }
