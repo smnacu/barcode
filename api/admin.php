@@ -162,6 +162,19 @@ switch ($action) {
         echo json_encode(['status' => 'ok']);
         break;
 
+    case 'add_row_top':
+        $newData = $_POST['row_data'];
+        $allData = readCSV($target_csv);
+        // Insertar después del header (índice 1)
+        if (count($allData) > 0) {
+            array_splice($allData, 1, 0, [$newData]);
+        } else {
+            $allData[] = $newData;
+        }
+        writeCSV($target_csv, $allData);
+        echo json_encode(['status' => 'ok']);
+        break;
+
     case 'delete_row':
         $rowIndex = (int)$_POST['index'];
         $allData = readCSV($target_csv);

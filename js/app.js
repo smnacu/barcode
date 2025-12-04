@@ -60,12 +60,9 @@ function ensureAndroidCompatibility() {
     }
     document.addEventListener('touchstart', (e) => {
         if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') {
-            e.preventDefault();
-        }
-    }, { passive: false });
-    document.body.addEventListener('touchmove', (e) => {
-        if (e.touches.length > 1) {
-            e.preventDefault();
+            // Permitir foco en inputs
+        } else {
+            // e.preventDefault(); // Comentado para no bloquear scroll
         }
     }, { passive: false });
 }
@@ -79,16 +76,18 @@ document.addEventListener('DOMContentLoaded', () => {
     ensureAndroidCompatibility();
 
     if ('serviceWorker' in navigator) {
-        navigator.serviceWorker.register('./sw.js')
+        navigator.serviceWorker.register('./js/sw.js')
             .then(reg => console.log('✅ Service Worker registrado:', reg.scope))
             .catch(err => console.warn('⚠️ Error registrando SW:', err.message));
     }
 
     const stored = loadHistoryFromStorage();
     const historyList = document.getElementById('history-list');
-    stored.forEach(item => {
-        renderHistoryItem(historyList, item.ean, item.desc, item.url, item.success);
-    });
+    if (historyList) {
+        stored.forEach(item => {
+            renderHistoryItem(historyList, item.ean, item.desc, item.url, item.success);
+        });
+    }
 
     // Iniciar directamente
     requestCameraPermission();
@@ -124,7 +123,8 @@ async function startScanner() {
         if (scannerContainer) scannerContainer.classList.remove('hidden');
 
         // Asegurar elemento limpio
-        document.getElementById('reader').innerHTML = '';
+        const reader = document.getElementById('reader');
+        if (reader) reader.innerHTML = '';
 
         html5QrcodeScanner = new Html5Qrcode("reader");
 
@@ -167,10 +167,6 @@ async function startScanner() {
 
     } catch (err) {
         console.error("❌ Error fatal iniciando cámara:", err);
-
-        // CRÍTICO: NO ocultar el contenedor de video si falla, para ver si hay feed
-        // scannerContainer.classList.add('hidden');
-        // startScreen.classList.remove('hidden');
 
         let msg = `Error: ${err.message || err}`;
         if (errorMsg) {
@@ -281,6 +277,8 @@ function renderHistoryItem(list, ean, desc, url, success) {
 
 function addToHistory(ean, desc, url, success) {
     const list = document.getElementById('history-list');
+    if (!list) return;
+
     renderHistoryItem(list, ean, desc, url, success);
 
     const newItem = { ean, desc, url, success, timestamp: new Date().toISOString() };
@@ -290,4 +288,93 @@ function addToHistory(ean, desc, url, success) {
     while (list.children.length > MAX_HISTORY_ITEMS) {
         list.removeChild(list.lastChild);
     }
+}
+
+// ============================================================================
+// BÚSQUEDA MANUAL
+// ============================================================================
+
+const searchInput = document.getElementById('manual-search');
+const searchResults = document.getElementById('search-results');
+const resultsList = document.getElementById('results-list');
+let searchTimeout = null;
+
+if (searchInput) {
+    searchInput.addEventListener('input', (e) => {
+        const query = e.target.value.trim();
+        clearTimeout(searchTimeout);
+
+        if (query.length < 2) {
+            if (searchResults) searchResults.classList.add('hidden');
+            return;
+        }
+
+        searchTimeout = setTimeout(() => {
+            performManualSearch(query);
+        }, 400); // Debounce
+    });
+}
+
+function toggleSearch() {
+    if (!searchResults || !searchInput) return;
+
+    const isHidden = searchResults.classList.contains('hidden');
+    if (isHidden && searchInput.value.trim().length >= 2) {
+        searchResults.classList.remove('hidden');
+    } else if (!isHidden) {
+        searchResults.classList.add('hidden');
+    }
+}
+
+function closeSearch() {
+    if (searchResults) searchResults.classList.add('hidden');
+}
+
+async function performManualSearch(query) {
+    try {
+        const fd = new FormData();
+        fd.append('codigo', query);
+        fd.append('modo', 'lista'); // Nuevo modo lista
+
+        const res = await fetch('api/buscar.php', { method: 'POST', body: fd });
+        const data = await res.json();
+
+        renderSearchResults(data);
+    } catch (err) {
+        console.error('Error en búsqueda manual:', err);
+    }
+}
+
+function renderSearchResults(data) {
+    if (!resultsList) return;
+    resultsList.innerHTML = '';
+
+    if (!data.encontrado || !data.resultados || data.resultados.length === 0) {
+        resultsList.innerHTML = '<div class="text-gray-500 text-center p-4">No se encontraron resultados</div>';
+        if (searchResults) searchResults.classList.remove('hidden');
+        return;
+    }
+
+    data.resultados.forEach(item => {
+        const el = document.createElement('div');
+        el.className = 'bg-gray-800 p-3 rounded-lg border border-gray-700 hover:bg-gray-700 cursor-pointer transition-colors flex flex-col gap-1';
+        el.innerHTML = `
+            <div class="flex justify-between items-start">
+                <span class="font-bold text-white text-sm">${item.descripcion}</span>
+                <span class="text-xs bg-gray-900 text-gray-400 px-1.5 py-0.5 rounded border border-gray-600">${item.codigo}</span>
+            </div>
+            <div class="text-xs text-gray-400 flex gap-2">
+                <span>EAN: ${item.ean}</span>
+            </div>
+        `;
+        el.onclick = () => {
+            // Simular escaneo exitoso
+            onScanSuccess(item.codigo);
+            closeSearch();
+            if (searchInput) searchInput.value = '';
+        };
+        resultsList.appendChild(el);
+    });
+
+    if (searchResults) searchResults.classList.remove('hidden');
 }
