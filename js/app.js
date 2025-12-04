@@ -1,7 +1,29 @@
 /**
  * app.js - Scanner de códigos de barras EAN-13
- * Optimizado para Android 11 de bajos recursos
+ * Con sistema de logging para debug
  */
+
+// ============================================================================
+// SISTEMA DE LOG
+// ============================================================================
+function addLog(message, type) {
+    type = type || 'info';
+    var logContent = document.getElementById('log-content');
+    if (!logContent) return;
+
+    var time = new Date().toLocaleTimeString();
+    var entry = document.createElement('div');
+    entry.className = 'log-entry ' + type;
+    entry.textContent = '[' + time + '] ' + message;
+    logContent.insertBefore(entry, logContent.firstChild);
+
+    // Limitar a 50 entradas
+    while (logContent.children.length > 50) {
+        logContent.removeChild(logContent.lastChild);
+    }
+
+    console.log('[' + type.toUpperCase() + '] ' + message);
+}
 
 // ============================================================================
 // CONFIGURACIÓN
@@ -27,7 +49,16 @@ try {
 // INICIALIZACIÓN
 // ============================================================================
 document.addEventListener('DOMContentLoaded', function () {
+    addLog('App iniciada - v20241204b', 'info');
     loadHistory();
+
+    // Verificar que la librería está cargada
+    if (typeof Html5Qrcode === 'undefined') {
+        addLog('ERROR: html5-qrcode no cargada!', 'error');
+        return;
+    }
+    addLog('Librería html5-qrcode OK', 'success');
+
     // Pequeño delay para asegurar que el DOM esté listo
     setTimeout(function () {
         startScanner();
@@ -38,8 +69,10 @@ document.addEventListener('DOMContentLoaded', function () {
 // SCANNER
 // ============================================================================
 function startScanner() {
+    addLog('Iniciando scanner...', 'info');
+
     if (isCameraBusy) {
-        console.log('Camera busy, skipping start');
+        addLog('Cámara ocupada, saltando', 'error');
         return;
     }
     isCameraBusy = true;
@@ -50,6 +83,7 @@ function startScanner() {
     // Limpiar instancia previa
     var cleanup = Promise.resolve();
     if (html5QrcodeScanner) {
+        addLog('Limpiando scanner previo...', 'info');
         cleanup = stopCurrentScanner();
     }
 
@@ -57,12 +91,17 @@ function startScanner() {
         return new Promise(function (resolve) { setTimeout(resolve, 300); });
     }).then(function () {
         var reader = document.getElementById('reader');
-        if (reader) reader.innerHTML = '';
+        if (!reader) {
+            addLog('ERROR: Elemento #reader no encontrado!', 'error');
+            isCameraBusy = false;
+            return Promise.reject('No reader element');
+        }
+        reader.innerHTML = '';
 
+        addLog('Creando instancia Html5Qrcode...', 'info');
         html5QrcodeScanner = new Html5Qrcode("reader");
 
         // Config OPTIMIZADA para EAN-13 (códigos de barras)
-        // qrbox ancho y bajo para capturar barras horizontales
         var config = {
             fps: 15,
             qrbox: { width: 300, height: 80 },
@@ -78,34 +117,39 @@ function startScanner() {
             ]
         };
 
-        // IMPORTANTE: Solo pasar facingMode
+        addLog('Config: fps=' + config.fps + ', qrbox=' + config.qrbox.width + 'x' + config.qrbox.height, 'info');
+        addLog('Formatos: EAN_13, EAN_8, UPC_A, UPC_E, CODE_128, CODE_39', 'info');
+        addLog('Solicitando cámara: ' + currentFacingMode, 'info');
+
         return html5QrcodeScanner.start(
             { facingMode: currentFacingMode },
             config,
             onScanSuccess,
-            function () { }
+            onScanFailure
         ).catch(function (err) {
-            console.warn('Trying fallback with environment facing mode', err);
+            addLog('Intento 1 falló: ' + err, 'error');
+            addLog('Probando fallback "environment"...', 'info');
             return html5QrcodeScanner.start(
                 "environment",
                 config,
                 onScanSuccess,
-                function () { }
+                onScanFailure
             );
         }).catch(function (err) {
-            console.warn('Trying fallback with user facing mode', err);
+            addLog('Intento 2 falló: ' + err, 'error');
+            addLog('Probando fallback "user"...', 'info');
             return html5QrcodeScanner.start(
                 "user",
                 config,
                 onScanSuccess,
-                function () { }
+                onScanFailure
             );
         });
     }).then(function () {
-        console.log('Scanner started successfully');
+        addLog('✓ SCANNER INICIADO OK', 'success');
         isCameraBusy = false;
     }).catch(function (err) {
-        console.error("Error cámara:", err);
+        addLog('ERROR FATAL: ' + err, 'error');
         isCameraBusy = false;
         if (errorMsg) {
             var msg = err.message || String(err);
@@ -115,6 +159,11 @@ function startScanner() {
             }
         }
     });
+}
+
+function onScanFailure(error) {
+    // Este callback se llama constantemente cuando NO encuentra código
+    // Solo logueamos errores reales, no el "no code found"
 }
 
 function stopCurrentScanner() {
@@ -132,7 +181,7 @@ function stopCurrentScanner() {
                     html5QrcodeScanner = null;
                     resolve();
                 }).catch(function (e) {
-                    console.warn("Error stopping scanner:", e);
+                    addLog('Error al parar scanner: ' + e, 'error');
                     html5QrcodeScanner = null;
                     resolve();
                 });
@@ -142,7 +191,7 @@ function stopCurrentScanner() {
                 resolve();
             }
         } catch (e) {
-            console.warn("Error in stopCurrentScanner:", e);
+            addLog('Error en stopCurrentScanner: ' + e, 'error');
             html5QrcodeScanner = null;
             resolve();
         }
@@ -152,13 +201,24 @@ function stopCurrentScanner() {
 function switchCamera() {
     if (isCameraBusy) return;
     currentFacingMode = (currentFacingMode === "user") ? "environment" : "user";
+    addLog('Cambiando cámara a: ' + currentFacingMode, 'info');
     startScanner();
 }
 
-function onScanSuccess(decodedText) {
+function onScanSuccess(decodedText, decodedResult) {
     var now = Date.now();
-    if (decodedText === lastScannedEAN && (now - lastScanTime) < SCAN_COOLDOWN_MS) return;
-    if (isProcessing) return;
+
+    addLog('DETECTADO: ' + decodedText, 'scan');
+    addLog('Formato: ' + (decodedResult.result.format ? decodedResult.result.format.formatName : 'desconocido'), 'scan');
+
+    if (decodedText === lastScannedEAN && (now - lastScanTime) < SCAN_COOLDOWN_MS) {
+        addLog('Código repetido, ignorando (cooldown)', 'info');
+        return;
+    }
+    if (isProcessing) {
+        addLog('Ya procesando, ignorando', 'info');
+        return;
+    }
 
     isProcessing = true;
     lastScannedEAN = decodedText;
@@ -177,16 +237,24 @@ function onScanSuccess(decodedText) {
         }, 500);
     }
 
+    addLog('Buscando en API: ' + decodedText, 'info');
+
     fetch('api/buscar.php?codigo=' + encodeURIComponent(decodedText))
-        .then(function (response) { return response.json(); })
+        .then(function (response) {
+            addLog('Respuesta API: ' + response.status, 'info');
+            return response.json();
+        })
         .then(function (data) {
             if (data.encontrado) {
+                addLog('✓ Producto encontrado: ' + (data.producto ? data.producto.descripcion : 'sin desc'), 'success');
                 handleFound(data);
             } else {
+                addLog('✗ Producto NO encontrado', 'error');
                 handleNotFound(decodedText);
             }
         })
         .catch(function (error) {
+            addLog('ERROR API: ' + error.message, 'error');
             addToHistory(decodedText, 'Error: ' + error.message, null, false);
         })
         .finally(function () {
@@ -223,6 +291,7 @@ function handleFound(data) {
     addToHistory(code, title, fullUrl, true);
 
     if (fullUrl) {
+        addLog('Abriendo PDF: ' + fullUrl, 'info');
         window.open(fullUrl, '_blank');
     }
 }
@@ -247,7 +316,10 @@ function loadHistory() {
                 items.forEach(function (item) { renderHistoryItem(list, item); });
             }
         }
-    } catch (e) { }
+        addLog('Historial cargado: ' + items.length + ' items', 'info');
+    } catch (e) {
+        addLog('Error cargando historial: ' + e, 'error');
+    }
 }
 
 function addToHistory(ean, desc, url, success) {
@@ -303,6 +375,7 @@ function clearHistory() {
     if (list) {
         list.innerHTML = '<div class="empty-history">Sin escaneos recientes</div>';
     }
+    addLog('Historial borrado', 'info');
 }
 
 function escapeHtml(text) {
@@ -339,6 +412,7 @@ function closeSearch() {
 }
 
 function performManualSearch(query) {
+    addLog('Búsqueda manual: ' + query, 'info');
     var fd = new FormData();
     fd.append('codigo', query);
     fd.append('modo', 'lista');
@@ -346,7 +420,9 @@ function performManualSearch(query) {
     fetch('api/buscar.php', { method: 'POST', body: fd })
         .then(function (res) { return res.json(); })
         .then(function (data) { renderSearchResults(data); })
-        .catch(function (err) { console.error(err); });
+        .catch(function (err) {
+            addLog('Error búsqueda: ' + err, 'error');
+        });
 }
 
 function renderSearchResults(data) {
@@ -359,6 +435,8 @@ function renderSearchResults(data) {
         return;
     }
 
+    addLog('Resultados búsqueda: ' + data.resultados.length, 'info');
+
     data.resultados.forEach(function (item) {
         var el = document.createElement('div');
         el.className = 'result-item';
@@ -367,7 +445,7 @@ function renderSearchResults(data) {
             '<div class="result-item-code">Código: ' + escapeHtml(item.codigo) + ' | EAN: ' + escapeHtml(item.ean) + '</div>';
 
         el.onclick = function () {
-            onScanSuccess(item.codigo);
+            onScanSuccess(item.codigo, { result: { format: { formatName: 'MANUAL' } } });
             closeSearch();
             if (searchInput) searchInput.value = '';
         };

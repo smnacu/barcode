@@ -5,6 +5,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <meta name="theme-color" content="#000000">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
     <title>Scanner ITDelivery</title>
     <link rel="manifest" href="manifest.json">
     <style>
@@ -70,7 +73,7 @@
         .header-right {
             display: flex;
             align-items: center;
-            gap: 12px;
+            gap: 8px;
         }
 
         #scan-status {
@@ -83,19 +86,23 @@
             gap: 4px;
         }
 
-        .settings-btn {
+        .header-btn {
             width: 36px;
             height: 36px;
             background: rgba(255, 255, 255, 0.05);
             border: 1px solid rgba(255, 255, 255, 0.1);
             border-radius: 8px;
             color: var(--text-muted);
-            font-size: 18px;
+            font-size: 16px;
             cursor: pointer;
             display: flex;
             align-items: center;
             justify-content: center;
             text-decoration: none;
+        }
+
+        .header-btn:active {
+            background: rgba(255, 255, 255, 0.15);
         }
 
         .pulse-dot {
@@ -247,6 +254,17 @@
             height: 100% !important;
         }
 
+        /* OCULTAR el HUD interno de html5-qrcode */
+        #reader>div,
+        #reader img,
+        #reader canvas {
+            display: none !important;
+        }
+
+        #reader video {
+            display: block !important;
+        }
+
         /* LÍNEA ROJA de escaneo - estilo lector de supermercado */
         .scanner-guide {
             position: absolute;
@@ -255,6 +273,7 @@
             display: flex;
             align-items: center;
             justify-content: center;
+            z-index: 10;
         }
 
         .scan-line {
@@ -303,6 +322,7 @@
             display: flex;
             align-items: center;
             justify-content: center;
+            z-index: 20;
         }
 
         .switch-camera-btn:active {
@@ -320,6 +340,7 @@
             font-size: 12px;
             background: rgba(0, 0, 0, 0.8);
             padding: 8px;
+            z-index: 20;
         }
 
         #error-msg.visible {
@@ -335,6 +356,78 @@
             text-align: center;
             font-size: 11px;
             color: rgba(255, 255, 255, 0.5);
+            z-index: 20;
+        }
+
+        /* LOG PANEL */
+        .log-panel {
+            display: none;
+            position: fixed;
+            top: 60px;
+            right: 10px;
+            width: 300px;
+            max-height: 50vh;
+            background: rgba(0, 0, 0, 0.95);
+            border: 1px solid #333;
+            border-radius: 12px;
+            z-index: 200;
+            font-family: monospace;
+            font-size: 10px;
+            overflow: hidden;
+        }
+
+        .log-panel.visible {
+            display: block;
+        }
+
+        .log-header {
+            padding: 8px 12px;
+            background: #1a1a1a;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid #333;
+        }
+
+        .log-header span {
+            font-weight: bold;
+            color: var(--text-muted);
+        }
+
+        .log-close {
+            background: none;
+            border: none;
+            color: var(--brand-red);
+            font-size: 16px;
+            cursor: pointer;
+        }
+
+        .log-content {
+            padding: 8px;
+            max-height: calc(50vh - 40px);
+            overflow-y: auto;
+        }
+
+        .log-entry {
+            padding: 4px 0;
+            border-bottom: 1px solid #222;
+            color: #888;
+        }
+
+        .log-entry.info {
+            color: #4fc3f7;
+        }
+
+        .log-entry.success {
+            color: var(--success);
+        }
+
+        .log-entry.error {
+            color: var(--brand-red);
+        }
+
+        .log-entry.scan {
+            color: #ffeb3b;
         }
 
         /* HISTORY PANEL - DESPLEGABLE */
@@ -511,9 +604,19 @@
             <div id="scan-status">
                 <span class="pulse-dot"></span>
             </div>
-            <a href="admin.html" class="settings-btn" title="Configuración">⚙️</a>
+            <button class="header-btn" onclick="toggleLog()" title="Ver Log">📋</button>
+            <a href="admin.html" class="header-btn" title="Configuración">⚙️</a>
         </div>
     </header>
+
+    <!-- Log Panel -->
+    <div class="log-panel" id="log-panel">
+        <div class="log-header">
+            <span>DEBUG LOG</span>
+            <button class="log-close" onclick="toggleLog()">✕</button>
+        </div>
+        <div class="log-content" id="log-content"></div>
+    </div>
 
     <!-- Main Content -->
     <div class="main-content">
@@ -561,7 +664,7 @@
     </div>
 
     <script src="js/libs/html5-qrcode.min.js"></script>
-    <script src="js/app.js"></script>
+    <script src="js/app.js?v=20241204b"></script>
     <script>
         if ('serviceWorker' in navigator) {
             navigator.serviceWorker.register('./js/sw.js').catch(function () { });
@@ -571,6 +674,13 @@
             var panel = document.getElementById('history-panel');
             if (panel) {
                 panel.classList.toggle('expanded');
+            }
+        }
+
+        function toggleLog() {
+            var panel = document.getElementById('log-panel');
+            if (panel) {
+                panel.classList.toggle('visible');
             }
         }
     </script>
