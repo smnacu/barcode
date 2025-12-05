@@ -230,13 +230,45 @@ var Scanner = {
     isProcessing: false,
     facingMode: "environment",
     lastScan: { code: null, time: 0 },
-    COOLDOWN: 2000,
+    COOLDOWN: 1500,  // Reducido a 1.5s para flujo más rápido
+    SAFETY_TIMEOUT: 10000, // 10 segundos máximo de bloqueo
+    safetyTimer: null,
+
+    // Resetea todos los flags de bloqueo
+    resetFlags: function () {
+        this.isProcessing = false;
+        this.isBusy = false;
+        if (this.safetyTimer) {
+            clearTimeout(this.safetyTimer);
+            this.safetyTimer = null;
+        }
+    },
+
+    // Inicia un timer de seguridad para evitar bloqueos permanentes
+    startSafetyTimer: function () {
+        var self = this;
+        if (this.safetyTimer) clearTimeout(this.safetyTimer);
+
+        this.safetyTimer = setTimeout(function () {
+            UI.addLog('Safety: Reseteando flags bloqueados', 'warning');
+            self.resetFlags();
+            UI.setStatus('Listo - Apunta el codigo', 'success');
+        }, this.SAFETY_TIMEOUT);
+    },
 
     start: function () {
         var self = this;
 
+        // Si está ocupado, intentar resetear después de un tiempo prudente
         if (this.isBusy) {
-            UI.setStatus('Camara ocupada...', 'scanning');
+            UI.setStatus('Camara ocupada, reintentando...', 'scanning');
+            setTimeout(function () {
+                if (self.isBusy) {
+                    UI.addLog('Forzando reset de camara', 'warning');
+                    self.isBusy = false;
+                    self.start();
+                }
+            }, 2000);
             return;
         }
         this.isBusy = true;
@@ -335,6 +367,26 @@ var Scanner = {
         this.start();
     },
 
+    // Reinicia el escáner cuando el usuario vuelve a la pestaña
+    handleVisibilityChange: function () {
+        var self = this;
+        if (document.visibilityState === 'visible') {
+            UI.addLog('Pestaña activa - verificando escaner', 'info');
+            // Resetear flags por si quedaron bloqueados
+            self.isProcessing = false;
+
+            // Verificar si el escáner está funcionando
+            setTimeout(function () {
+                if (!self.instance || !self.isBusy) {
+                    UI.addLog('Reiniciando escaner por visibilidad', 'info');
+                    self.start();
+                } else {
+                    UI.setStatus('Listo - Apunta el codigo', 'success');
+                }
+            }, 500);
+        }
+    },
+
     onScan: function (decodedText, decodedResult) {
         var self = this;
         var now = Date.now();
@@ -344,14 +396,23 @@ var Scanner = {
 
         UI.addLog('DETECTADO: ' + decodedText + ' (' + formatName + ')', 'scan');
 
-        // Evitar escaneos repetidos
+        // Evitar escaneos repetidos (pero permitir después del cooldown)
         if (decodedText === this.lastScan.code && (now - this.lastScan.time) < this.COOLDOWN) {
+            UI.addLog('Ignorado: mismo codigo en cooldown', 'info');
             return;
         }
-        if (this.isProcessing) return;
+
+        // Si está procesando, loguear pero no bloquear indefinidamente
+        if (this.isProcessing) {
+            UI.addLog('Procesando anterior, ignorando...', 'info');
+            return;
+        }
 
         this.isProcessing = true;
         this.lastScan = { code: decodedText, time: now };
+
+        // Iniciar timer de seguridad
+        this.startSafetyTimer();
 
         // Feedback inmediato
         AudioHandler.vibrate(200);
@@ -379,8 +440,11 @@ var Scanner = {
 
                     // Abrir PDF - "acto de fe"
                     if (pdfUrl) {
-                        UI.addLog('PDF: ' + pdfUrl, 'info');
+                        UI.addLog('Abriendo PDF: ' + pdfUrl, 'info');
                         window.open(pdfUrl, '_blank');
+                        UI.addLog('PDF abierto en nueva pestaña', 'success');
+                    } else {
+                        UI.addLog('Producto sin PDF asociado', 'warning');
                     }
                 } else {
                     UI.setStatus('NO EN CSV: ' + decodedText, 'error');
@@ -391,16 +455,25 @@ var Scanner = {
                 }
             })
             .catch(function (err) {
-                UI.setStatus('ERROR RED: ' + err.message, 'error');
+                UI.setStatus('ERROR RED: ' + (err.message || err), 'error');
                 UI.flashEffect('#ef4444');
                 AudioHandler.vibrate([300]);
                 AudioHandler.beep('error');
                 DataManager.saveItem(decodedText, 'Error de conexion', null, false);
+                UI.addLog('Error de red: ' + (err.message || err), 'error');
             })
             .finally(function () {
+                // Limpiar timer de seguridad
+                if (self.safetyTimer) {
+                    clearTimeout(self.safetyTimer);
+                    self.safetyTimer = null;
+                }
+
+                // Liberar para siguiente escaneo después del cooldown
                 setTimeout(function () {
                     self.isProcessing = false;
                     UI.setStatus('Listo - Apunta el codigo', 'success');
+                    UI.addLog('Escaner listo para nuevo codigo', 'info');
                 }, self.COOLDOWN);
             });
     }
@@ -489,6 +562,24 @@ document.addEventListener('DOMContentLoaded', function () {
     // Habilitar audio en primer toque (iOS/Android)
     document.body.addEventListener('touchstart', function () { AudioHandler.resume(); }, { once: true });
     document.body.addEventListener('click', function () { AudioHandler.resume(); }, { once: true });
+
+    // Listener para cuando el usuario vuelve a la pestaña
+    document.addEventListener('visibilitychange', function () {
+        Scanner.handleVisibilityChange();
+    });
+
+    // Verificación periódica cada 30 segundos para asegurar que el escáner esté funcionando
+    setInterval(function () {
+        if (document.visibilityState === 'visible' && !Scanner.isProcessing) {
+            // Si pasaron más de 30s y el estado muestra error, reintentar
+            var statusEl = document.getElementById('status-text');
+            if (statusEl && statusEl.textContent.indexOf('ERROR') !== -1) {
+                UI.addLog('Auto-recuperacion: reintentando camara', 'warning');
+                Scanner.resetFlags();
+                Scanner.start();
+            }
+        }
+    }, 30000);
 
     // Arrancar scanner
     setTimeout(function () { Scanner.start(); }, 500);
