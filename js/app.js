@@ -228,7 +228,7 @@ var Scanner = {
     instance: null,
     isBusy: false,
     isProcessing: false,
-    facingMode: "environment",
+    facingMode: "user",
     lastScan: { code: null, time: 0 },
     COOLDOWN: 1500,  // Reducido a 1.5s para flujo más rápido
     SAFETY_TIMEOUT: 10000, // 10 segundos máximo de bloqueo
