@@ -290,6 +290,8 @@ var Scanner = {
     COOLDOWN: 1500,  // Reducido a 1.5s para flujo más rápido
     SAFETY_TIMEOUT: 10000, // 10 segundos máximo de bloqueo
     safetyTimer: null,
+    retryCount: 0,
+    MAX_RETRIES: 3,
 
     // Resetea todos los flags de bloqueo
     resetFlags: function () {
@@ -321,6 +323,11 @@ var Scanner = {
 
         // Si está ocupado, intentar resetear después de un tiempo prudente
         if (this.isBusy) {
+            // Si ya fallamos demasiadas veces, no insistir en este ciclo rapido
+            if (this.retryCount >= this.MAX_RETRIES) {
+                return;
+            }
+
             UI.setStatus('Camara ocupada, reintentando...', 'scanning');
             setTimeout(function () {
                 if (self.isBusy) {
@@ -376,11 +383,20 @@ var Scanner = {
         }).then(function () {
             UI.setStatus('Listo - Apunta el codigo', 'success');
             self.isBusy = false;
+            self.retryCount = 0; // Resetear contador al tener exito
             // Activar Wake Lock al encender camara
             if (typeof PowerManager !== 'undefined') PowerManager.requestWakeLock();
         }).catch(function (err) {
-            UI.addLog('Error camara: ' + err, 'error');
-            // Fallback
+            self.retryCount++;
+            UI.addLog('Error camara (' + self.retryCount + '/' + self.MAX_RETRIES + '): ' + err, 'error');
+
+            if (self.retryCount >= self.MAX_RETRIES) {
+                UI.setStatus('ERROR FATAL: Hardware no accesible. Recargue la pagina.', 'error');
+                self.isBusy = false;
+                return;
+            }
+
+            // Fallback try
             if (self.instance) {
                 self.instance.start("environment", { fps: 10, qrbox: 250 },
                     function (t, r) { self.onScan(t, r); },
@@ -388,12 +404,21 @@ var Scanner = {
                 ).then(function () {
                     UI.setStatus('Modo compatibilidad', 'warning');
                     self.isBusy = false;
+                    self.retryCount = 0;
                 }).catch(function (e) {
-                    UI.setStatus('ERROR CAMARA', 'error');
+                    // Si falla el fallback, dejamos que el contador suba en el siguiente intento (si lo hubiera)
+                    // Pero como estamos en el catch del start principal, probablemente terminemos aqui.
+                    // Forzamos un nuevo intento tras delay si no es fatal
+                    setTimeout(function () {
+                        if (self.retryCount < self.MAX_RETRIES) self.start();
+                    }, 2000);
                     self.isBusy = false;
                 });
             } else {
                 self.isBusy = false;
+                setTimeout(function () {
+                    if (self.retryCount < self.MAX_RETRIES) self.start();
+                }, 2000);
             }
         });
     },
@@ -693,9 +718,9 @@ document.addEventListener('DOMContentLoaded', function () {
             // Si estmos en Standby, NO hacer nada
             if (Scanner.isStandby) return;
 
-            // Si pasaron más de 30s y el estado muestra error, reintentar
+            // Si pasaron más de 30s y el estado muestra error, reintentar (SALVO QUE SEA FATAL)
             var statusEl = document.getElementById('status-text');
-            if (statusEl && statusEl.textContent.indexOf('ERROR') !== -1) {
+            if (statusEl && statusEl.textContent.indexOf('ERROR') !== -1 && statusEl.textContent.indexOf('FATAL') === -1) {
                 UI.addLog('Auto-recuperacion: reintentando camara', 'warning');
                 Scanner.resetFlags();
                 Scanner.start();
