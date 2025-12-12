@@ -191,6 +191,7 @@ var StandbyHandler = {
     wake: function () {
         if (!this.overlay) return;
         this.overlay.classList.remove('active');
+        Scanner.isStandby = false; // Desactivar flag
         Scanner.start();
         // PowerManager.requestWakeLock(); // Scanner.start se encarga
     }
@@ -280,6 +281,7 @@ var DataManager = {
 var Scanner = {
     instance: null,
     isBusy: false,
+    isStandby: false,
     isProcessing: false,
     facingMode: "user",
     lastScan: { code: null, time: 0 },
@@ -302,6 +304,9 @@ var Scanner = {
     // Inicia un timer de seguridad para evitar bloqueos permanentes
     startSafetyTimer: function () {
         var self = this;
+        // Si estamos en Standby, NO iniciar timers que puedan reactivar cosas
+        if (this.isStandby) return;
+
         if (this.safetyTimer) clearTimeout(this.safetyTimer);
 
         this.safetyTimer = setTimeout(function () {
@@ -395,6 +400,20 @@ var Scanner = {
 
     stop: function () {
         var self = this;
+
+        // 1. AGGRESSIVE HARDWARE RELEASE (Fix critico)
+        // Intentar detener las pistas de video manualmente para asegurar que el LED se apague
+        try {
+            var video = document.querySelector('#reader video');
+            if (video && video.srcObject) {
+                var tracks = video.srcObject.getTracks();
+                tracks.forEach(function (track) {
+                    try { track.stop(); } catch (e) { }
+                });
+                video.srcObject = null;
+            }
+        } catch (e) { console.log('Error forcing track stop', e); }
+
         return new Promise(function (resolve) {
             if (!self.instance) return resolve();
 
@@ -432,6 +451,9 @@ var Scanner = {
     // Reinicia el escáner cuando el usuario vuelve a la pestaña
     handleVisibilityChange: function () {
         var self = this;
+        // Si estamos en Standby, NO reiniciar camara automaticamente
+        if (this.isStandby) return;
+
         if (document.visibilityState === 'visible') {
             UI.addLog('Pestaña activa - verificando escaner', 'info');
             // Resetear flags por si quedaron bloqueados
@@ -517,9 +539,20 @@ var Scanner = {
                         UI.addLog('PDF abierto en nueva pestaña', 'success');
 
                         // ACTIVAR STANDBY MODE
-                        // Damos un pequeño delay para asegurar que el navegador registre el popup antes de matar el proceso
+                        // 1. Marcar flag global
+                        self.isStandby = true;
+
+                        // 2. Limpiar safety timer para que no resetee nada
+                        if (self.safetyTimer) clearTimeout(self.safetyTimer);
+
+                        // 3. Forzar detencion de camara INMEDIATA
+                        self.stop();
+
+                        // 4. Activar UI de Standby con pequeño delay visual
                         setTimeout(function () {
                             StandbyHandler.sleep();
+                            // 5. Mantener WakeLock activo para que el dispositivo no se duerma en standby
+                            if (typeof PowerManager !== 'undefined') PowerManager.requestWakeLock();
                         }, 500);
 
                         self.lastPdfCode = decodedText;
@@ -657,6 +690,9 @@ document.addEventListener('DOMContentLoaded', function () {
     // Verificación periódica cada 30 segundos para asegurar que el escáner esté funcionando
     setInterval(function () {
         if (document.visibilityState === 'visible' && !Scanner.isProcessing) {
+            // Si estmos en Standby, NO hacer nada
+            if (Scanner.isStandby) return;
+
             // Si pasaron más de 30s y el estado muestra error, reintentar
             var statusEl = document.getElementById('status-text');
             if (statusEl && statusEl.textContent.indexOf('ERROR') !== -1) {
