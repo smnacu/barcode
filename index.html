@@ -8,6 +8,7 @@
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <title>Scanner ITDelivery</title>
     <link rel="manifest" href="manifest.json">
+    <link rel="stylesheet" href="css/standby.css">
     <style>
         :root {
             --bg-body: #000;
@@ -654,7 +655,15 @@
         <div class="footer-credit">Daruma Consulting SRL</div>
     </div>
 
+    <!-- Standby Overlay -->
+    <div id="standby-overlay">
+        <div class="standby-icon">💤</div>
+        <div class="standby-text">Scanner en reposo</div>
+        <div class="standby-hint">Toca la pantalla para activar</div>
+    </div>
+
     <script src="js/libs/html5-qrcode.min.js"></script>
+    <script src="js/powermanager.js"></script>
     <script src="js/app.js?v=modular1"></script>
     <script>
         if ('serviceWorker' in navigator) {

@@ -162,6 +162,41 @@ var AudioHandler = {
 };
 
 // ============================================================================
+// 2b. MODULO DE STANDBY (Reposo)
+// ============================================================================
+var StandbyHandler = {
+    overlay: null,
+
+    init: function () {
+        this.overlay = document.getElementById('standby-overlay');
+        if (this.overlay) {
+            this.overlay.addEventListener('click', function () {
+                StandbyHandler.wake();
+            });
+            // Tambien suportar touchstart para respuesta mas rapida
+            this.overlay.addEventListener('touchstart', function () {
+                StandbyHandler.wake();
+            });
+        }
+    },
+
+    sleep: function () {
+        if (!this.overlay) return;
+        Scanner.stop();
+        // PowerManager.releaseWakeLock(); // Scanner.stop ya deberia encargarse si lo integramos bien, pero forzamos por seguridad
+        this.overlay.classList.add('active');
+        UI.setStatus('En Reposo - Toca para activar', 'warning');
+    },
+
+    wake: function () {
+        if (!this.overlay) return;
+        this.overlay.classList.remove('active');
+        Scanner.start();
+        // PowerManager.requestWakeLock(); // Scanner.start se encarga
+    }
+};
+
+// ============================================================================
 // 3. MODULO DE DATOS (History & API)
 // ============================================================================
 var DataManager = {
@@ -336,6 +371,8 @@ var Scanner = {
         }).then(function () {
             UI.setStatus('Listo - Apunta el codigo', 'success');
             self.isBusy = false;
+            // Activar Wake Lock al encender camara
+            if (typeof PowerManager !== 'undefined') PowerManager.requestWakeLock();
         }).catch(function (err) {
             UI.addLog('Error camara: ' + err, 'error');
             // Fallback
@@ -367,6 +404,7 @@ var Scanner = {
                     self.instance.stop().then(function () {
                         try { self.instance.clear(); } catch (e) { }
                         self.instance = null;
+                        if (typeof PowerManager !== 'undefined') PowerManager.releaseWakeLock();
                         resolve();
                     }).catch(function () {
                         self.instance = null;
@@ -477,6 +515,13 @@ var Scanner = {
                         UI.addLog('Abriendo PDF: ' + pdfUrl, 'info');
                         window.open(pdfUrl, '_blank');
                         UI.addLog('PDF abierto en nueva pestaña', 'success');
+
+                        // ACTIVAR STANDBY MODE
+                        // Damos un pequeño delay para asegurar que el navegador registre el popup antes de matar el proceso
+                        setTimeout(function () {
+                            StandbyHandler.sleep();
+                        }, 500);
+
                         self.lastPdfCode = decodedText;
                         self.lastPdfTime = now;
                     } else if (isRepeated) {
@@ -586,6 +631,8 @@ var ManualSearch = {
 document.addEventListener('DOMContentLoaded', function () {
     // Inicializar modulos
     UI.init();
+    if (typeof PowerManager !== 'undefined') PowerManager.init();
+    StandbyHandler.init();
     UI.setStatus('Inicializando...', 'scanning');
 
     AudioHandler.init();
