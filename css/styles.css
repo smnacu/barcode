@@ -533,6 +533,75 @@ body.light-mode .header-logo {
     border-color: var(--text-muted);
 }
 
+.history-header-left {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.collapse-sidebar-btn {
+    background: var(--bg-input);
+    border: 1px solid var(--border-color);
+    color: var(--text-main);
+    padding: 5px 10px;
+    border-radius: var(--radius-sm);
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    transition: all 0.2s;
+    touch-action: manipulation;
+}
+
+.collapse-sidebar-btn:hover {
+    background: var(--border-color);
+    color: var(--brand-red);
+}
+
+.collapse-sidebar-btn:active {
+    transform: scale(0.96);
+}
+
+@media (max-width: 767px), (orientation: portrait) and (max-width: 1024px) {
+    .collapse-sidebar-btn {
+        display: none !important;
+    }
+}
+
+.floating-history-btn {
+    position: fixed;
+    top: 16px;
+    left: 16px;
+    padding: 12px 18px;
+    border-radius: 30px;
+    background: rgba(18, 18, 22, 0.9);
+    backdrop-filter: blur(8px);
+    color: #ffffff;
+    font-size: 14px;
+    font-weight: 700;
+    border: 1.5px solid rgba(255, 255, 255, 0.25);
+    cursor: pointer;
+    display: none;
+    align-items: center;
+    gap: 8px;
+    z-index: 10000;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.5);
+    touch-action: manipulation;
+    transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.floating-history-btn:hover {
+    background: var(--brand-red);
+    border-color: rgba(255, 255, 255, 0.5);
+    transform: scale(1.05);
+}
+
+.floating-history-btn:active {
+    transform: scale(0.95);
+}
+
 #history-list {
     flex: 1;
     overflow-y: auto;
@@ -634,6 +703,10 @@ body.light-mode .footer-logo {
         height: calc(100vh - var(--header-height));
         max-height: calc(100vh - var(--header-height));
         overflow: hidden;
+        transition: grid-template-columns 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    body.sidebar-collapsed .app-layout {
+        grid-template-columns: 0px 1fr;
     }
     .history-panel {
         position: relative !important;
@@ -649,9 +722,18 @@ body.light-mode .footer-logo {
         border-bottom: none !important;
         transform: none !important;
         box-shadow: none !important;
-        z-index: 10;
+        z-index: 100;
         display: flex !important;
         flex-direction: column !important;
+        transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.2s ease, width 0.3s ease;
+        overflow: hidden;
+    }
+    body.sidebar-collapsed .history-panel {
+        transform: translateX(-100%) !important;
+        width: 0 !important;
+        opacity: 0 !important;
+        pointer-events: none !important;
+        border-right: none !important;
     }
     .history-panel #history-list {
         flex: 1;
@@ -938,7 +1020,8 @@ body.hide-navs .scanner-container {
         left: 320px !important;
         width: calc(100vw - 320px) !important;
         height: calc(100vh - var(--header-height)) !important;
-        padding: 20px !important;
+        padding: 16px !important;
+        transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1) !important;
     }
     body.hide-navs .scanner-container.has-image,
     body.hide-navs .scanner-container {
@@ -947,10 +1030,30 @@ body.hide-navs .scanner-container {
         width: calc(100vw - 320px) !important;
         height: 100vh !important;
         padding: 0 !important;
+        transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1) !important;
     }
     body.hide-navs .history-panel {
         transform: none !important;
         display: flex !important;
+    }
+
+    /* Cuando el historial está guardado (sidebar-collapsed), la imagen ocupa toda la pantalla */
+    body.sidebar-collapsed .scanner-container.has-image {
+        left: 0 !important;
+        width: 100vw !important;
+        height: calc(100vh - var(--header-height)) !important;
+        padding: 8px !important;
+    }
+    body.sidebar-collapsed.hide-navs .scanner-container.has-image,
+    body.sidebar-collapsed.hide-navs .scanner-container {
+        top: 0 !important;
+        left: 0 !important;
+        width: 100vw !important;
+        height: 100vh !important;
+        padding: 0 !important;
+    }
+    body.sidebar-collapsed .floating-history-btn {
+        display: inline-flex !important;
     }
 }
 

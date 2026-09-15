@@ -9,7 +9,7 @@
     <title>Scanner Peirano</title>
     <link rel="icon" type="image/png" href="img/favicon.png">
     <link rel="manifest" href="manifest.json">
-    <link rel="stylesheet" href="css/styles.css?v=9">
+    <link rel="stylesheet" href="css/styles.css?v=10">
 </head>
 
 <body>
@@ -19,6 +19,7 @@
         <img src="img/logo_peirano.png" alt="Logo" class="header-logo">
         <span class="header-title">Scanner <span id="header-badge" style="font-size: 0.7em; opacity: 0.7; border: 1px solid #444; padding: 2px 4px; border-radius: 4px;">P1</span></span>
         <button class="theme-switch" onclick="toggleTheme()" title="Cambiar tema">🌓</button>
+        <button class="header-btn" onclick="toggleSidebar()" title="Mostrar/Guardar Historial">📋</button>
         <button class="header-btn" onclick="openConfig()" title="Configuración">⚙️</button>
         <button class="header-btn" onclick="location.reload()" title="Recargar">🔄</button>
     </div>
@@ -85,9 +86,12 @@
     <div class="app-layout">
         <!-- History Panel -->
         <aside class="history-panel" id="history-panel">
-            <div class="history-header" onclick="toggleHistory()">
-                <span class="history-title">📋 Historial</span>
-                <button class="clear-history-btn" onclick="event.stopPropagation(); clearHistory()">BORRAR</button>
+            <div class="history-header">
+                <div class="history-header-left" onclick="toggleSidebar()">
+                    <button class="collapse-sidebar-btn" onclick="event.stopPropagation(); toggleSidebar(true)" title="Guardar/Ocultar historial">◀ Guardar</button>
+                    <span class="history-title">📋 Historial</span>
+                </div>
+                <button class="clear-history-btn" onclick="event.stopPropagation(); clearHistory()" title="Borrar historial">BORRAR</button>
             </div>
             <div id="history-list">
                 <div class="empty-history">Sin escaneos</div>
@@ -136,14 +140,42 @@
     </div>
 
     <script src="js/libs/html5-qrcode.min.js"></script>
-    <script src="js/app.js?v=modular5"></script>
+    <script src="js/app.js?v=modular6"></script>
     <script>
         if ('serviceWorker' in navigator) {
             navigator.serviceWorker.register('./js/sw.js').catch(function () { });
         }
 
+        function toggleSidebar(force) {
+            var isPortrait = window.matchMedia('(orientation: portrait), (max-width: 767px)').matches;
+            var panel = document.getElementById('history-panel');
+            var btnOpen = document.getElementById('btn-open-sidebar');
+
+            if (isPortrait) {
+                if (panel) panel.classList.toggle('expanded');
+                return;
+            }
+
+            var isHidden = document.body.classList.contains('sidebar-collapsed') || 
+                           (document.body.classList.contains('hide-navs') && !document.body.classList.contains('show-sidebar'));
+
+            var shouldCollapse = (typeof force === 'boolean') ? force : !isHidden;
+
+            if (shouldCollapse) {
+                document.body.classList.add('sidebar-collapsed');
+                document.body.classList.remove('show-sidebar');
+                if (btnOpen) btnOpen.style.display = 'inline-flex';
+            } else {
+                document.body.classList.remove('sidebar-collapsed');
+                if (document.body.classList.contains('hide-navs')) {
+                    document.body.classList.add('show-sidebar');
+                }
+                if (btnOpen) btnOpen.style.display = 'none';
+            }
+        }
+
         function toggleHistory() {
-            document.getElementById('history-panel').classList.toggle('expanded');
+            toggleSidebar();
         }
 
         function toggleLog() {
@@ -207,6 +239,7 @@ window.onclick = function(event) {
 
     </script>
     <!-- Floating Controls -->
+    <button id="btn-open-sidebar" class="floating-history-btn" onclick="toggleSidebar(false)" title="Ver Historial" style="display: none;">📋 Historial</button>
     <button id="btn-scan-again" class="floating-scan-btn" onclick="forceRescan()" title="Nuevo Escaneo" style="display: none;">📷 Re-escanear</button>
     <button class="floating-reload-btn" onclick="location.reload()" title="Recargar Página">🔄</button>
 </body>

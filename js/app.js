@@ -942,11 +942,46 @@ function forceRescan() {
 
     AudioHandler.beep('success');
     UI.flashEffect('#3b82f6');
-    UI.setStatus('Listo - Apunta el codigo', 'success');
+    document.body.classList.remove('sidebar-collapsed');
+    document.body.classList.remove('show-sidebar');
+    var btnOpenSidebar = document.getElementById('btn-open-sidebar');
+    if (btnOpenSidebar) btnOpenSidebar.style.display = 'none';
 
     if (typeof Scanner !== 'undefined') {
         Scanner.start();
     }
+}
+
+function toggleSidebar(force) {
+    var isPortrait = window.matchMedia('(orientation: portrait), (max-width: 767px)').matches;
+    var panel = document.getElementById('history-panel');
+    var btnOpen = document.getElementById('btn-open-sidebar');
+
+    if (isPortrait) {
+        if (panel) panel.classList.toggle('expanded');
+        return;
+    }
+
+    var isHidden = document.body.classList.contains('sidebar-collapsed') || 
+                   (document.body.classList.contains('hide-navs') && !document.body.classList.contains('show-sidebar'));
+
+    var shouldCollapse = (typeof force === 'boolean') ? force : !isHidden;
+
+    if (shouldCollapse) {
+        document.body.classList.add('sidebar-collapsed');
+        document.body.classList.remove('show-sidebar');
+        if (btnOpen) btnOpen.style.display = 'inline-flex';
+    } else {
+        document.body.classList.remove('sidebar-collapsed');
+        if (document.body.classList.contains('hide-navs')) {
+            document.body.classList.add('show-sidebar');
+        }
+        if (btnOpen) btnOpen.style.display = 'none';
+    }
+}
+
+function toggleHistory() {
+    toggleSidebar();
 }
 
 function resetScannerUI() {

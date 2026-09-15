@@ -3,7 +3,7 @@
  * Estrategia: Network-first para HTML/PHP/JS, Cache-first para assets estaticos
  */
 
-var CACHE_NAME = 'barcodeC-v5';
+var CACHE_NAME = 'barcodeC-v6';
 
 var urlsToCache = [
     './',
@@ -20,7 +20,7 @@ var urlsToCache = [
 
 // Instalacion
 self.addEventListener('install', function (event) {
-    console.log('[SW] Instalando v5...');
+    console.log('[SW] Instalando v6...');
     event.waitUntil(
         caches.open(CACHE_NAME).then(function (cache) {
             return Promise.all(
