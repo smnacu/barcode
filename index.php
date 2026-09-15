@@ -9,10 +9,10 @@
     <title>Scanner Peirano</title>
     <link rel="icon" type="image/png" href="img/favicon.png">
     <link rel="manifest" href="manifest.json">
-    <link rel="stylesheet" href="css/styles.css?v=10">
+    <link rel="stylesheet" href="css/styles.css?v=11">
 </head>
 
-<body>
+<body class="sidebar-collapsed">
     <!-- Header -->
     <header class="app-header">
     <div class="header-left">
@@ -140,7 +140,7 @@
     </div>
 
     <script src="js/libs/html5-qrcode.min.js"></script>
-    <script src="js/app.js?v=modular6"></script>
+    <script src="js/app.js?v=modular7"></script>
     <script>
         if ('serviceWorker' in navigator) {
             navigator.serviceWorker.register('./js/sw.js').catch(function () { });

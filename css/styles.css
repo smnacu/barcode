@@ -565,16 +565,17 @@ body.light-mode .header-logo {
 }
 
 @media (max-width: 767px), (orientation: portrait) and (max-width: 1024px) {
-    .collapse-sidebar-btn {
+    .collapse-sidebar-btn,
+    .floating-history-btn {
         display: none !important;
     }
 }
 
 .floating-history-btn {
     position: fixed;
-    top: 16px;
+    top: 72px; /* Debajo del header (56px) para no superponerse con el logo de Peirano */
     left: 16px;
-    padding: 12px 18px;
+    padding: 10px 16px;
     border-radius: 30px;
     background: rgba(18, 18, 22, 0.9);
     backdrop-filter: blur(8px);

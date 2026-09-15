@@ -430,15 +430,12 @@ var Scanner = {
                             self.stop();
                         };
                         img.onerror = function() {
-                            if (pdfUrl && !isRepeated) {
-                                window.open(pdfUrl, '_blank');
-                                self.lastPdfCode = decodedText;
-                                self.lastPdfTime = now;
-                            }
+                            console.warn('Imagen no disponible para:', decodedText);
+                            UI.setStatus('Imagen no disponible', 'warning');
                         };
                         img.src = imgUrl;
-                    } else if (pdfUrl && !isRepeated) {
-                        window.open(pdfUrl, '_blank');
+                    } else {
+                        UI.setStatus('Escaneo registrado (Sin imagen de plano)', 'warning');
                         self.lastPdfCode = decodedText;
                         self.lastPdfTime = now;
                     }
@@ -793,8 +790,10 @@ var SyncManager = {
                                                 document.body.classList.add('hide-navs');
                                             };
                                             img.onerror = function() {
-                                                if (newPdf) {
-                                                    window.open(newPdf, '_blank');
+                                                console.warn("No se pudo cargar la imagen para visor:", data.data.ean);
+                                                var jobDisplay = document.getElementById('viewer-current-job');
+                                                if (jobDisplay) {
+                                                    jobDisplay.innerHTML = '<div class="job-status-msg" style="color: var(--warning); margin-top:20px;">⚠️ IMAGEN NO DISPONIBLE</div>';
                                                 }
                                             };
                                             img.src = newImg;
@@ -802,15 +801,9 @@ var SyncManager = {
                                             var jobDisplay = document.getElementById('viewer-current-job');
                                             if (jobDisplay) {
                                                 jobDisplay.innerHTML =
-                                                    '<div class="job-status-msg" style="color: var(--warning); margin-top:20px;">⚠️ ABRIENDO PLANO...</div>' +
-                                                    '<a href="' + newPdf + '" target="_blank" class="manual-open-btn">ABRIR AHORA</a>';
+                                                    '<div class="job-status-msg" style="color: var(--warning); margin-top:20px;">Plano disponible en PDF:</div>' +
+                                                    '<a href="' + newPdf + '" target="_blank" class="manual-open-btn">ABRIR PDF</a>';
                                             }
-                                            setTimeout(function () {
-                                                var newWin = window.open(newPdf, '_blank');
-                                                if (!newWin || newWin.closed || typeof newWin.closed == 'undefined') {
-                                                    UI.setStatus('CLIC EN "ABRIR AHORA" REQUERIDO', 'warning');
-                                                }
-                                            }, 500);
                                         }
                                     } else {
                                         var jobDisplay = document.getElementById('viewer-current-job');
@@ -942,10 +935,7 @@ function forceRescan() {
 
     AudioHandler.beep('success');
     UI.flashEffect('#3b82f6');
-    document.body.classList.remove('sidebar-collapsed');
     document.body.classList.remove('show-sidebar');
-    var btnOpenSidebar = document.getElementById('btn-open-sidebar');
-    if (btnOpenSidebar) btnOpenSidebar.style.display = 'none';
 
     if (typeof Scanner !== 'undefined') {
         Scanner.start();
