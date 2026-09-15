@@ -1,0 +1,52 @@
+[
+  {
+    "id": 1,
+    "title": "1. ¿Qué significan las siglas del título (ej: L1-P1 o LP)?",
+    "content": "El indicador superior muestra la identidad del equipo en la línea:\n- L1, L2, L3, L4: Línea de Producción asignada.\n- P1: Puesto 1 (Armador / Escáner principal).\n- P2 / P3: Puestos 2 y 3 (Control y Empaque / Visores automáticos).\n- (LP): 'Low Performance'. Se activa automáticamente en tablets de recursos limitados para ahorrar batería y memoria RAM."
+  },
+  {
+    "id": 2,
+    "title": "2. ¿Cómo sincronizo el Puesto 1 con el resto de la línea?",
+    "content": "La sincronización es AUTOMÁTICA. Cada vez que escaneas un código válido en el Puesto 1, la orden se envía instantáneamente a los Puestos 2 y 3 de tu misma línea.\nNo necesitas activar botones adicionales en el Puesto 1 para transmitir.\nSi deseas verificar el estado de red, abre el menú de tres puntos (⋮) en la esquina superior derecha y revisa la opción '📡 Sincronizar'."
+  },
+  {
+    "id": 3,
+    "title": "3. Los Puestos 2 o 3 no reciben el plano que acabo de escanear",
+    "content": "Verifica los siguientes puntos en orden:\n1. MISMA LÍNEA: Comprueba que todas las pantallas indiquen el mismo número de línea (ej: L1-P1 y L1-P2). Si una dice L2, cámbiala desde el engranaje (⚙️).\n2. ESTADO DE LOS VISORES: En los puestos 2 y 3 debe figurar 'ESPERANDO ORDEN'. Si la pantalla quedó congelada con una pieza anterior, toca el botón flotante '🔄' para recargar.\n3. CONEXIÓN WI-FI: Comprueba que la tablet esté conectada a la red Wi-Fi de planta."
+  },
+  {
+    "id": 4,
+    "title": "4. Escaneo y sale 'NO EN CSV' en rojo con un bip grave",
+    "content": "Significa que el código de barras o EAN leído no existe en la base de datos de producción cargada en el sistema.\n1. Verifica si el código impreso en la pieza coincide con la orden de fabricación.\n2. Prueba buscar la pieza escribiendo su código o nombre en la barra de búsqueda superior (🔍).\n3. Si la pieza es de lanzamiento reciente o cambio de serie, avisa al Supervisor de Línea para que dé de alta el artículo en el panel de administración."
+  },
+  {
+    "id": 5,
+    "title": "5. El sistema dice 'PLANO NO DISPONIBLE' o error al abrir PDF",
+    "content": "El producto existe en la base de datos CSV, pero el archivo técnico no se encuentra en el servidor:\n1. El archivo JPG o PDF de la hoja de procesos aún no fue cargado en el servidor central (192.168.170.160).\n2. El producto requiere una variante por puesto (ej: _P2 para Control) y el archivo subido no contiene dicho sufijo.\nNotifica al Supervisor o a Ingeniería indicando el código del producto y el puesto afectado."
+  },
+  {
+    "id": 6,
+    "title": "6. Aparece 'CLIC EN ABRIR AHORA REQUERIDO' en Puesto 2 o 3",
+    "content": "Ocurre cuando el navegador Google Chrome bloquea la apertura automática de ventanas emergentes (Pop-ups):\n1. Toca directamente el botón amarillo 'ABRIR AHORA' para visualizar el plano.\n2. Para solucionarlo definitivamente: En la barra de direcciones de Chrome, toca el ícono de candado o configuración del sitio, ve a 'Permisos' -> 'Ventanas emergentes y redirecciones' y selecciona 'Permitir'."
+  },
+  {
+    "id": 7,
+    "title": "7. ¿Cómo volver a escanear si quedó la foto del producto en pantalla?",
+    "content": "Cuando el sistema encuentra una hoja técnica en formato imagen, la muestra a pantalla completa para evitar saturar la memoria.\nPara escanear la siguiente pieza, toca el botón rojo con la cámara (📷) ubicado en la pantalla."
+  },
+  {
+    "id": 8,
+    "title": "8. Desaparecieron los botones y la barra superior (Pantalla negra)",
+    "content": "El sistema entró en modo inmersivo de pantalla completa.\nToca una vez con el dedo en el centro de la pantalla (fuera de los botones) para alternar y volver a mostrar la barra de navegación superior y el menú."
+  },
+  {
+    "id": 9,
+    "title": "9. La cámara no enciende o dice 'ERROR CAMARA' / 'Cámara ocupada'",
+    "content": "1. Toca el botón de recarga (🔄) en la barra superior o el botón flotante inferior.\n2. Si persiste, toca el botón de alternar cámara (🔄) situado dentro del recuadro del escáner.\n3. Asegúrate de haber otorgado permisos de cámara al navegador.\n4. Cierra cualquier otra pestaña o aplicación que pudiera estar utilizando la cámara de la tablet y reinicia el navegador."
+  },
+  {
+    "id": 10,
+    "title": "10. La etiqueta está rota, manchada o no escanea",
+    "content": "1. Limpia la lente de la cámara con un paño seco.\n2. Mejora la iluminación sobre el código o ajusta la distancia de la pieza.\n3. Si la etiqueta está rota o ilegible, escribe manualmente el código numérico o parte de la descripción en el buscador superior (🔍) y selecciónalo de la lista desplegable."
+  }
+]

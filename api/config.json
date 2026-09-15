@@ -1,6 +1,11 @@
 {
-    "ruta_pdf": "http://192.168.170.160/PDF-EXPGRIFERIA/",
-    "ruta_csv": "../csv/0codigos.csv",
+    "ruta_pdf": "http://192.168.170.160/PDF-EXPGRIFERIA/Hojas-de-procesos-nuevo",
+    "ruta_csv": "../csv/nov25.csv",
     "timeout_segundos": 10,
-    "admin_password": "queija1234"
+    "forzar_p1": false,
+    "forzar_sufijo": "",
+    "sufijo_puesto_1": "P1",
+    "sufijo_puesto_2": "P2",
+    "sufijo_puesto_3": "P3",
+    "usar_sufijos_puesto": true
 }

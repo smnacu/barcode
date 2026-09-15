@@ -1,14 +1,5 @@
-/**
- * app.js - Scanner de codigos de barras (Modular)
- * Estructura modular compatible con Android 11+
- */
-
-// ============================================================================
-// 1. MODULO DE INTERFAZ (UI)
-// ============================================================================
 var UI = {
     elements: {},
-
     init: function () {
         this.elements = {
             statusBar: document.getElementById('status-bar'),
@@ -20,7 +11,6 @@ var UI = {
             resultsList: document.getElementById('results-list')
         };
     },
-
     setStatus: function (message, type) {
         type = type || 'scanning';
         if (this.elements.statusBar && this.elements.statusText) {
@@ -29,55 +19,43 @@ var UI = {
         }
         this.addLog(message, type);
     },
-
     addLog: function (message, type) {
         type = type || 'info';
         if (!this.elements.logContent) return;
-
         var time = new Date().toLocaleTimeString();
         var entry = document.createElement('div');
         entry.className = 'log-entry ' + type;
         entry.textContent = '[' + time + '] ' + message;
-
         this.elements.logContent.insertBefore(entry, this.elements.logContent.firstChild);
         if (this.elements.logContent.children.length > 50) {
             this.elements.logContent.removeChild(this.elements.logContent.lastChild);
         }
-        console.log('[' + type.toUpperCase() + '] ' + message);
     },
-
     addHistoryItem: function (item, prepend) {
         if (!this.elements.historyList) return;
-
         var empty = this.elements.historyList.querySelector('.empty-history');
         if (empty) empty.remove();
-
         var el = document.createElement('div');
         el.className = 'history-item ' + (item.success ? 'success' : 'error');
-
         var actionBtn = (item.success && item.url)
             ? '<a href="' + item.url + '" target="_blank" class="open-pdf-btn">ABRIR</a>'
             : '';
-
         el.innerHTML =
             '<div class="history-item-info">' +
             '<div class="history-item-code">' + this.escapeHtml(item.ean) + '</div>' +
             '<div class="history-item-desc">' + this.escapeHtml(item.desc) + '</div>' +
             '</div>' + actionBtn;
-
         if (prepend) {
             this.elements.historyList.insertBefore(el, this.elements.historyList.firstChild);
         } else {
             this.elements.historyList.appendChild(el);
         }
     },
-
     clearHistoryUI: function () {
         if (this.elements.historyList) {
             this.elements.historyList.innerHTML = '<div class="empty-history">Sin escaneos</div>';
         }
     },
-
     flashEffect: function (color) {
         color = color || '#22c55e';
         var container = document.querySelector('.scanner-container');
@@ -90,14 +68,12 @@ var UI = {
             }, 500);
         }
     },
-
     toggleSearch: function (show) {
         if (this.elements.searchResults) {
             if (show) this.elements.searchResults.classList.add('visible');
             else this.elements.searchResults.classList.remove('visible');
         }
     },
-
     escapeHtml: function (text) {
         if (!text) return '';
         var div = document.createElement('div');
@@ -105,37 +81,26 @@ var UI = {
         return div.innerHTML;
     }
 };
-
-// ============================================================================
-// 2. MODULO DE AUDIO & FEEDBACK
-// ============================================================================
 var AudioHandler = {
     context: null,
-
     init: function () {
         try {
             this.context = new (window.AudioContext || window.webkitAudioContext)();
-        } catch (e) {
-            console.log('Audio API no soportada');
-        }
+        } catch (e) { }
     },
-
     resume: function () {
         if (this.context && this.context.state === 'suspended') {
             this.context.resume();
         }
     },
-
     beep: function (type) {
         if (!this.context) return;
         type = type || 'success';
-
         try {
             var osc = this.context.createOscillator();
             var gain = this.context.createGain();
             osc.connect(gain);
             gain.connect(this.context.destination);
-
             if (type === 'success') {
                 osc.frequency.value = 1800;
                 osc.type = 'sine';
@@ -153,7 +118,6 @@ var AudioHandler = {
             }
         } catch (e) { }
     },
-
     vibrate: function (pattern) {
         if ('vibrate' in navigator) {
             try { navigator.vibrate(pattern); } catch (e) { }
@@ -161,54 +125,21 @@ var AudioHandler = {
     }
 };
 
-// ============================================================================
-// 2b. MODULO DE STANDBY (Reposo)
-// ============================================================================
-var StandbyHandler = {
-    overlay: null,
-
-    init: function () {
-        this.overlay = document.getElementById('standby-overlay');
-        if (this.overlay) {
-            this.overlay.addEventListener('click', function () {
-                StandbyHandler.wake();
-            });
-            // Tambien suportar touchstart para respuesta mas rapida
-            this.overlay.addEventListener('touchstart', function () {
-                StandbyHandler.wake();
-            });
-        }
-    },
-
-    sleep: function () {
-        if (!this.overlay) return;
-        Scanner.stop();
-        // PowerManager.releaseWakeLock(); // Scanner.stop ya deberia encargarse si lo integramos bien, pero forzamos por seguridad
-        this.overlay.classList.add('active');
-        UI.setStatus('En Reposo - Toca para activar', 'warning');
-    },
-
-    wake: function () {
-        if (!this.overlay) return;
-        this.overlay.classList.remove('active');
-        Scanner.isStandby = false; // Desactivar flag
-        Scanner.start();
-        // PowerManager.requestWakeLock(); // Scanner.start se encarga
-    }
-};
-
-// ============================================================================
-// 3. MODULO DE DATOS (History & API)
-// ============================================================================
 var DataManager = {
     STORAGE_KEY: 'barcodeC_history',
     MAX_ITEMS: 30,
-
     loadHistory: function () {
         try {
             var stored = localStorage.getItem(this.STORAGE_KEY);
             var items = stored ? JSON.parse(stored) : [];
-
+            if (items.length > 0 && items[0].timestamp) {
+                var lastDate = new Date(items[0].timestamp).toDateString();
+                var today = new Date().toDateString();
+                if (lastDate !== today) {
+                    this.clearHistory();
+                    items = [];
+                }
+            }
             if (items.length === 0) {
                 UI.clearHistoryUI();
             } else {
@@ -218,7 +149,6 @@ var DataManager = {
             }
         } catch (e) { }
     },
-
     saveItem: function (ean, desc, url, success) {
         var newItem = {
             ean: ean,
@@ -227,22 +157,14 @@ var DataManager = {
             success: success,
             timestamp: new Date().toISOString()
         };
-
         try {
             var stored = localStorage.getItem(this.STORAGE_KEY);
             var existing = stored ? JSON.parse(stored) : [];
-
-            // FILTRO: Si ya existe este EAN, lo sacamos de la lista actual
             existing = existing.filter(function (item) {
                 return item.ean !== ean;
             });
-
-            // Agregamos el nuevo al principio
             var updated = [newItem].concat(existing).slice(0, this.MAX_ITEMS);
             localStorage.setItem(this.STORAGE_KEY, JSON.stringify(updated));
-
-            // Refrescamos la UI completa para que se vea el orden correcto (el ítem sube al puesto 1)
-            // Esto evita tener duplicados visuales en la lista
             if (UI.elements.historyList) {
                 UI.elements.historyList.innerHTML = '';
                 for (var i = 0; i < updated.length; i++) {
@@ -250,22 +172,18 @@ var DataManager = {
                 }
             }
         } catch (e) {
-            console.error(e);
-            // Fallback por si falla el storage: agregarlo visualmente igual
             UI.addHistoryItem(newItem, true);
         }
     },
-
     clearHistory: function () {
         localStorage.removeItem(this.STORAGE_KEY);
         UI.clearHistoryUI();
     },
-
     searchCode: function (code) {
-        return fetch('api/buscar.php?codigo=' + encodeURIComponent(code))
+        var puesto = (typeof AppConfig !== 'undefined') ? AppConfig.puesto : 1;
+        return fetch('api/buscar.php?codigo=' + encodeURIComponent(code) + '&puesto=' + puesto)
             .then(function (res) { return res.json(); });
     },
-
     searchList: function (query) {
         var fd = new FormData();
         fd.append('codigo', query);
@@ -274,26 +192,17 @@ var DataManager = {
             .then(function (res) { return res.json(); });
     }
 };
-
-// ============================================================================
-// 4. MODULO DE ESCANER
-// ============================================================================
 var Scanner = {
     instance: null,
     isBusy: false,
-    isStandby: false,
     isProcessing: false,
     facingMode: "user",
     lastScan: { code: null, time: 0 },
     lastPdfCode: null,
     lastPdfTime: 0,
-    COOLDOWN: 1500,  // Reducido a 1.5s para flujo más rápido
-    SAFETY_TIMEOUT: 10000, // 10 segundos máximo de bloqueo
+    COOLDOWN: 1500,
+    SAFETY_TIMEOUT: 10000,
     safetyTimer: null,
-    retryCount: 0,
-    MAX_RETRIES: 3,
-
-    // Resetea todos los flags de bloqueo
     resetFlags: function () {
         this.isProcessing = false;
         this.isBusy = false;
@@ -302,36 +211,23 @@ var Scanner = {
             this.safetyTimer = null;
         }
     },
-
-    // Inicia un timer de seguridad para evitar bloqueos permanentes
     startSafetyTimer: function () {
         var self = this;
-        // Si estamos en Standby, NO iniciar timers que puedan reactivar cosas
-        if (this.isStandby) return;
-
         if (this.safetyTimer) clearTimeout(this.safetyTimer);
-
         this.safetyTimer = setTimeout(function () {
-            UI.addLog('Safety: Reseteando flags bloqueados', 'warning');
             self.resetFlags();
             UI.setStatus('Listo - Apunta el codigo', 'success');
         }, this.SAFETY_TIMEOUT);
     },
-
     start: function () {
         var self = this;
-
-        // Si está ocupado, intentar resetear después de un tiempo prudente
+        if (AppConfig.puesto > 1) {
+            return;
+        }
         if (this.isBusy) {
-            // Si ya fallamos demasiadas veces, no insistir en este ciclo rapido
-            if (this.retryCount >= this.MAX_RETRIES) {
-                return;
-            }
-
             UI.setStatus('Camara ocupada, reintentando...', 'scanning');
             setTimeout(function () {
                 if (self.isBusy) {
-                    UI.addLog('Forzando reset de camara', 'warning');
                     self.isBusy = false;
                     self.start();
                 }
@@ -340,7 +236,6 @@ var Scanner = {
         }
         this.isBusy = true;
         UI.setStatus('Abriendo camara...', 'scanning');
-
         this.stop().then(function () {
             return new Promise(function (resolve) { setTimeout(resolve, 300); });
         }).then(function () {
@@ -351,13 +246,10 @@ var Scanner = {
                 return Promise.reject('No reader');
             }
             reader.innerHTML = '';
-
             self.instance = new Html5Qrcode("reader");
-
+            var fpsConfig = (AppConfig.lowPerf) ? 10 : 15;
             var config = {
-                fps: 15,
-                qrbox: { width: 280, height: 120 }, // Aumentado alto para facilitar encuadre manual
-                aspectRatio: 1.777,
+                fps: fpsConfig,
                 disableFlip: true,
                 experimentalFeatures: {
                     useBarCodeDetectorIfSupported: true
@@ -368,12 +260,8 @@ var Scanner = {
                     Html5QrcodeSupportedFormats.UPC_A,
                     Html5QrcodeSupportedFormats.UPC_E,
                     Html5QrcodeSupportedFormats.QR_CODE
-                    // Desactivados temporalmente para evitar falsos positivos con ruido
-                    // Html5QrcodeSupportedFormats.CODE_128,
-                    // Html5QrcodeSupportedFormats.CODE_39
                 ]
             };
-
             return self.instance.start(
                 { facingMode: self.facingMode },
                 config,
@@ -383,72 +271,58 @@ var Scanner = {
         }).then(function () {
             UI.setStatus('Listo - Apunta el codigo', 'success');
             self.isBusy = false;
-            self.retryCount = 0; // Resetear contador al tener exito
-            // Activar Wake Lock al encender camara
-            if (typeof PowerManager !== 'undefined') PowerManager.requestWakeLock();
+            setTimeout(function () {
+                try {
+                    var reader = document.getElementById('reader');
+                    if (!reader) return;
+                    var video = reader.querySelector('video');
+                    if (video) {
+                        video.style.cssText = 'width: 100% !important; height: 100% !important; object-fit: cover !important; z-index: 10 !important; position: absolute !important; top: 0; left: 0;';
+                    }
+                    var allElements = reader.getElementsByTagName('*');
+                    for (var i = 0; i < allElements.length; i++) {
+                        var el = allElements[i];
+                        if (el.tagName === 'VIDEO') continue;
+                        if (el.contains(video)) continue;
+                        var style = window.getComputedStyle(el);
+                        if (el.tagName === 'CANVAS' ||
+                            style.position === 'absolute' ||
+                            style.boxShadow !== 'none' ||
+                            el.id.indexOf('scan_region') !== -1) {
+                            el.style.display = 'none';
+                            el.style.opacity = '0';
+                        }
+                    }
+                } catch (e) {
+                }
+            }, 500);
         }).catch(function (err) {
-            self.retryCount++;
-            UI.addLog('Error camara (' + self.retryCount + '/' + self.MAX_RETRIES + '): ' + err, 'error');
-
-            if (self.retryCount >= self.MAX_RETRIES) {
-                UI.setStatus('ERROR FATAL: Hardware no accesible. Recargue la pagina.', 'error');
-                self.isBusy = false;
-                return;
-            }
-
-            // Fallback try
             if (self.instance) {
-                self.instance.start("environment", { fps: 10, qrbox: 250 },
+                self.instance.start("environment", { fps: 10 },
                     function (t, r) { self.onScan(t, r); },
                     function () { }
                 ).then(function () {
                     UI.setStatus('Modo compatibilidad', 'warning');
                     self.isBusy = false;
-                    self.retryCount = 0;
                 }).catch(function (e) {
-                    // Si falla el fallback, dejamos que el contador suba en el siguiente intento (si lo hubiera)
-                    // Pero como estamos en el catch del start principal, probablemente terminemos aqui.
-                    // Forzamos un nuevo intento tras delay si no es fatal
-                    setTimeout(function () {
-                        if (self.retryCount < self.MAX_RETRIES) self.start();
-                    }, 2000);
+                    UI.setStatus('ERROR CAMARA', 'error');
                     self.isBusy = false;
                 });
             } else {
                 self.isBusy = false;
-                setTimeout(function () {
-                    if (self.retryCount < self.MAX_RETRIES) self.start();
-                }, 2000);
             }
         });
     },
-
     stop: function () {
         var self = this;
-
-        // 1. AGGRESSIVE HARDWARE RELEASE (Fix critico)
-        // Intentar detener las pistas de video manualmente para asegurar que el LED se apague
-        try {
-            var video = document.querySelector('#reader video');
-            if (video && video.srcObject) {
-                var tracks = video.srcObject.getTracks();
-                tracks.forEach(function (track) {
-                    try { track.stop(); } catch (e) { }
-                });
-                video.srcObject = null;
-            }
-        } catch (e) { console.log('Error forcing track stop', e); }
-
         return new Promise(function (resolve) {
             if (!self.instance) return resolve();
-
             try {
                 var state = self.instance.getState();
                 if (state === Html5QrcodeScannerState.SCANNING || state === Html5QrcodeScannerState.PAUSED) {
                     self.instance.stop().then(function () {
                         try { self.instance.clear(); } catch (e) { }
                         self.instance = null;
-                        if (typeof PowerManager !== 'undefined') PowerManager.releaseWakeLock();
                         resolve();
                     }).catch(function () {
                         self.instance = null;
@@ -465,29 +339,21 @@ var Scanner = {
             }
         });
     },
-
     switchCamera: function () {
         if (this.isBusy) return;
         this.facingMode = (this.facingMode === "user") ? "environment" : "user";
         UI.setStatus('Cambiando camara...', 'scanning');
         this.start();
     },
-
-    // Reinicia el escáner cuando el usuario vuelve a la pestaña
     handleVisibilityChange: function () {
         var self = this;
-        // Si estamos en Standby, NO reiniciar camara automaticamente
-        if (this.isStandby) return;
-
         if (document.visibilityState === 'visible') {
-            UI.addLog('Pestaña activa - verificando escaner', 'info');
-            // Resetear flags por si quedaron bloqueados
             self.isProcessing = false;
-
-            // Verificar si el escáner está funcionando
+            if (typeof SyncManager !== 'undefined' && SyncManager.active) {
+                SyncManager.poll();
+            }
             setTimeout(function () {
                 if (!self.instance || !self.isBusy) {
-                    UI.addLog('Reiniciando escaner por visibilidad', 'info');
                     self.start();
                 } else {
                     UI.setStatus('Listo - Apunta el codigo', 'success');
@@ -495,99 +361,93 @@ var Scanner = {
             }, 500);
         }
     },
-
     onScan: function (decodedText, decodedResult) {
         var self = this;
         var now = Date.now();
-        var formatName = decodedResult.result && decodedResult.result.format
-            ? decodedResult.result.format.formatName
-            : 'UNKNOWN';
-
-        UI.addLog('DETECTADO: ' + decodedText + ' (' + formatName + ')', 'scan');
-
-        // Evitar escaneos repetidos (pero permitir después del cooldown)
-        if (decodedText === this.lastScan.code && (now - this.lastScan.time) < this.COOLDOWN) {
-            UI.addLog('Ignorado: mismo codigo en cooldown', 'info');
+        var isSameCode = (decodedText === this.lastScan.code);
+        if (isSameCode && (now - this.lastScan.time) < 20000) {
             return;
         }
-
-        // Si está procesando, loguear pero no bloquear indefinidamente
         if (this.isProcessing) {
-            UI.addLog('Procesando anterior, ignorando...', 'info');
             return;
         }
-
         this.isProcessing = true;
         this.lastScan = { code: decodedText, time: now };
-
-        // Iniciar timer de seguridad
         this.startSafetyTimer();
-
-        // Feedback inmediato
         AudioHandler.vibrate(200);
         AudioHandler.beep('success');
         UI.flashEffect('#22c55e');
-        UI.setStatus('Buscando: ' + decodedText + '...', 'scanning');
-
-        // Buscar en API
+        UI.setStatus('Escaneando...', 'scanning');
         DataManager.searchCode(decodedText)
             .then(function (data) {
                 if (data.encontrado) {
                     var desc = data.producto ? data.producto.descripcion : 'Encontrado';
                     var code = data.producto ? (data.producto.ean || data.producto.codigo) : decodedText;
                     var pdfUrl = data.pdf_url;
-
-                    if (!pdfUrl && data.pdf) {
-                        pdfUrl = data.pdf.indexOf('http') === 0
-                            ? data.pdf
-                            : 'api/ver_pdf.php?file=' + encodeURIComponent(data.pdf);
+                    var imgUrl = data.img_url;
+                    if (!pdfUrl && data.pdf && !imgUrl) {
+                        pdfUrl = data.pdf.indexOf('http') === 0 ? data.pdf : 'api/ver_pdf.php?file=' + encodeURIComponent(data.pdf);
                     }
-
-                    UI.setStatus('OK: ' + desc, 'success');
+                    UI.setStatus('Escaneo exitoso', 'success');
+                    var navProd = document.getElementById('nav-scanned-product');
+                    if (navProd) navProd.innerText = 'NUEVA ORDEN: ' + desc;
                     AudioHandler.vibrate([100, 50, 100]);
-
-                    // Guardamos/Actualizamos historial siempre
-                    DataManager.saveItem(code, desc, pdfUrl, true);
-
-                    // LOGICA ANTI-BUCLE:
-                    // Si el código es el mismo que el último escaneado, NO abrimos el PDF de nuevo.
-                    // Solo lo abrimos si es un código "nuevo" en esta sesión de escaneo.
+                    DataManager.saveItem(code, desc, pdfUrl || imgUrl, true);
+                    if (typeof SyncManager !== 'undefined') {
+                        SyncManager.notify(code, desc, pdfUrl || imgUrl);
+                    }
                     var isRepeated = (self.lastPdfCode === decodedText);
-
-                    // Truco: Forzamos isRepeated a false si pasó mucho tiempo (ej. 10 segundos)
-                    // para permitir re-abrir si el usuario quiere volver a verlo a propósito.
                     if ((now - self.lastPdfTime) > 10000) isRepeated = false;
+                    
+                    var isPuesto1 = (typeof AppConfig === 'undefined' || AppConfig.puesto == 1);
+                    var btnScan = document.getElementById('btn-scan-again');
+                    if (btnScan && isPuesto1) btnScan.style.display = 'flex';
 
-                    if (pdfUrl && !isRepeated) {
-                        UI.addLog('Abriendo PDF: ' + pdfUrl, 'info');
+                    if (imgUrl) {
+                        var existingImg = document.getElementById('product-image');
+                        if (existingImg) existingImg.remove();
+                        var img = new Image();
+                        img.id = 'product-image';
+                        img.className = 'scanned-image-result';
+                        img.onload = function() {
+                            var container = document.querySelector('.scanner-container');
+                            var reader = document.getElementById('reader');
+                            var scanRegion = document.querySelector('.scan-region');
+                            var statusBar = document.querySelector('.status-bar');
+                            var btnScan = document.getElementById('btn-scan-again');
+                            if (reader) reader.style.display = 'none';
+                            if (scanRegion) scanRegion.style.display = 'none';
+                            if (statusBar) statusBar.classList.add('hidden');
+                            if (btnScan && isPuesto1) btnScan.style.display = 'flex';
+                            if (container) {
+                                container.classList.add('has-image');
+                                container.appendChild(img);
+                            }
+                            document.body.classList.add('hide-navs');
+                            self.lastPdfCode = decodedText;
+                            self.lastPdfTime = now;
+                            // Detener la camara por completo para liberar CPU y memoria WebRTC
+                            self.stop();
+                        };
+                        img.onerror = function() {
+                            if (pdfUrl && !isRepeated) {
+                                window.open(pdfUrl, '_blank');
+                                self.lastPdfCode = decodedText;
+                                self.lastPdfTime = now;
+                            }
+                        };
+                        img.src = imgUrl;
+                    } else if (pdfUrl && !isRepeated) {
                         window.open(pdfUrl, '_blank');
-                        UI.addLog('PDF abierto en nueva pestaña', 'success');
-
-                        // ACTIVAR STANDBY MODE
-                        // 1. Marcar flag global
-                        self.isStandby = true;
-
-                        // 2. Limpiar safety timer para que no resetee nada
-                        if (self.safetyTimer) clearTimeout(self.safetyTimer);
-
-                        // 3. Forzar detencion de camara INMEDIATA
-                        self.stop();
-
-                        // 4. Activar UI de Standby con pequeño delay visual
-                        setTimeout(function () {
-                            StandbyHandler.sleep();
-                            // 5. Mantener WakeLock activo para que el dispositivo no se duerma en standby
-                            if (typeof PowerManager !== 'undefined') PowerManager.requestWakeLock();
-                        }, 500);
-
                         self.lastPdfCode = decodedText;
                         self.lastPdfTime = now;
-                    } else if (isRepeated) {
-                        UI.addLog('PDF no abierto (Código repetido)', 'info');
-                    } else {
-                        UI.addLog('Producto sin PDF asociado', 'warning');
                     }
-
+                } else if (data.error || data.offline) {
+                    UI.setStatus('SIN CONEXIÓN', 'warning');
+                    UI.flashEffect('#f59e0b');
+                    AudioHandler.vibrate([200]);
+                    AudioHandler.beep('error');
+                    DataManager.saveItem(decodedText, 'Sin conexion con servidor', null, false);
                 } else {
                     UI.setStatus('NO EN CSV: ' + decodedText, 'error');
                     UI.flashEffect('#ef4444');
@@ -597,67 +457,54 @@ var Scanner = {
                 }
             })
             .catch(function (err) {
-                UI.setStatus('ERROR RED: ' + (err.message || err), 'error');
+                UI.setStatus('ERROR RED', 'error');
                 UI.flashEffect('#ef4444');
                 AudioHandler.vibrate([300]);
                 AudioHandler.beep('error');
                 DataManager.saveItem(decodedText, 'Error de conexion', null, false);
-                UI.addLog('Error de red: ' + (err.message || err), 'error');
             })
             .finally(function () {
-                // Limpiar timer de seguridad
                 if (self.safetyTimer) {
                     clearTimeout(self.safetyTimer);
                     self.safetyTimer = null;
                 }
-
-                // Liberar para siguiente escaneo después del cooldown
                 setTimeout(function () {
                     self.isProcessing = false;
-                    UI.setStatus('Listo - Apunta el codigo', 'success');
-                    UI.addLog('Escaner listo para nuevo codigo', 'info');
+                    var statusBar = document.querySelector('.status-bar');
+                    if (statusBar && !statusBar.classList.contains('hidden')) {
+                        UI.setStatus('Listo - Apunta el codigo', 'success');
+                    }
                 }, self.COOLDOWN);
             });
     }
 };
-
-// ============================================================================
-// 5. MODULO DE BUSQUEDA MANUAL
-// ============================================================================
 var ManualSearch = {
     timeout: null,
-
     init: function () {
         var self = this;
         if (!UI.elements.manualInput) return;
-
         UI.elements.manualInput.addEventListener('input', function (e) {
             var query = e.target.value.trim();
             clearTimeout(self.timeout);
-
             if (query.length < 2) {
                 UI.toggleSearch(false);
                 return;
             }
-
             self.timeout = setTimeout(function () {
                 self.search(query);
             }, 400);
         });
     },
-
     search: function (query) {
         DataManager.searchList(query)
             .then(function (data) {
                 if (!UI.elements.resultsList) return;
                 UI.elements.resultsList.innerHTML = '';
-
                 if (!data.resultados || data.resultados.length === 0) {
                     UI.elements.resultsList.innerHTML = '<div class="result-item">Sin resultados</div>';
                     UI.toggleSearch(true);
                     return;
                 }
-
                 for (var i = 0; i < data.resultados.length; i++) {
                     (function (item) {
                         var el = document.createElement('div');
@@ -665,7 +512,6 @@ var ManualSearch = {
                         el.innerHTML =
                             '<div class="result-item-title">' + UI.escapeHtml(item.descripcion) + '</div>' +
                             '<div class="result-item-code">EAN: ' + UI.escapeHtml(item.ean) + '</div>';
-
                         el.onclick = function () {
                             UI.toggleSearch(false);
                             UI.elements.manualInput.value = '';
@@ -674,67 +520,503 @@ var ManualSearch = {
                         UI.elements.resultsList.appendChild(el);
                     })(data.resultados[i]);
                 }
-
                 UI.toggleSearch(true);
             })
-            .catch(function (err) {
-                UI.addLog('Error busqueda: ' + err, 'error');
-            });
+            .catch(function (err) { });
     }
 };
 
-// ============================================================================
-// 6. INICIALIZACION (Main)
-// ============================================================================
-document.addEventListener('DOMContentLoaded', function () {
-    // Inicializar modulos
-    UI.init();
-    if (typeof PowerManager !== 'undefined') PowerManager.init();
-    StandbyHandler.init();
-    UI.setStatus('Inicializando...', 'scanning');
+var AppConfig = {
+    line: 1,
+    puesto: 1,
+    lowPerf: false,
+    init: function () {
+        var urlParams = new URLSearchParams(window.location.search);
+        var pLine = urlParams.get('line');
+        var pPuesto = urlParams.get('puesto');
+        if (pLine && pPuesto) {
+            this.line = parseInt(pLine);
+            this.puesto = parseInt(pPuesto);
+            localStorage.setItem('barcode_app_config', JSON.stringify({
+                line: this.line,
+                puesto: this.puesto,
+                lowPerf: this.lowPerf
+            }));
+            if (window.history && window.history.replaceState) {
+                window.history.replaceState({}, document.title, window.location.pathname);
+            }
+        } else {
+            var saved = localStorage.getItem('barcode_app_config');
+            if (saved) {
+                try {
+                    var c = JSON.parse(saved);
+                    this.line = c.line || 1;
+                    this.puesto = c.puesto || 1;
+                    this.lowPerf = c.lowPerf || false;
+                } catch (e) { }
+            }
+        }
+        if (navigator.hardwareConcurrency && navigator.hardwareConcurrency < 4) {
+            this.lowPerf = true;
+        }
+        if (navigator.deviceMemory && navigator.deviceMemory < 4) {
+            this.lowPerf = true;
+        }
+        this.updateUI();
+    },
+    save: function (l, p, lp) {
+        this.line = l;
+        this.puesto = p;
+        if (lp !== undefined) this.lowPerf = lp;
+        localStorage.setItem('barcode_app_config', JSON.stringify({
+            line: this.line,
+            puesto: this.puesto,
+            lowPerf: this.lowPerf
+        }));
+        this.updateUI();
+        setTimeout(function () {
+            window.location.reload();
+        }, 500);
+    },
+    updateUI: function () {
+        var el = document.getElementById('header-badge');
+        if (el) el.textContent = 'L' + this.line + '-P' + this.puesto + (this.lowPerf ? ' (LP)' : '');
+        if (this.lowPerf) {
+            document.body.classList.add('low-perf');
+        } else {
+            document.body.classList.remove('low-perf');
+        }
+        this.applyPuestoMode();
+    },
+    applyPuestoMode: function () {
+        var isScanner = (this.puesto == 1);
+        var scannerContainer = document.querySelector('.scanner-container');
+        var manualSearch = document.querySelector('.search-container');
+        var rescanBtn = document.getElementById('btn-force-rescan');
+        var floatingScanBtn = document.getElementById('btn-scan-again');
+        if (!isScanner) {
+            if (scannerContainer) {
+                scannerContainer.innerHTML = '<div class="viewer-mode-screen">' +
+                    '<div class="viewer-icon">📡</div>' +
+                    '<div class="viewer-text">ESPERANDO ORDEN</div>' +
+                    '<div class="viewer-sub">Línea ' + this.line + ' - Puesto ' + this.puesto + '</div>' +
+                    '<div class="viewer-help">' +
+                    '<p>La pantalla se abrirá automáticamente.</p>' +
+                    '<p>Si se traba, presiona el botón:</p>' +
+                    '<button class="viewer-retry-btn" onclick="window.location.reload()">REINICIAR PAGINA</button>' +
+                    '</div>' +
+                    '<div id="viewer-current-job"></div>' +
+                    '</div>';
+                scannerContainer.style.background = '';
+                scannerContainer.style.display = 'flex';
+                scannerContainer.style.flexDirection = 'column';
+                scannerContainer.style.justifyContent = 'center';
+            }
+            if (manualSearch) manualSearch.style.display = 'none';
+            if (rescanBtn) rescanBtn.style.display = 'none';
+            if (floatingScanBtn) floatingScanBtn.style.display = 'none';
+            if (typeof SyncManager !== 'undefined') {
+                SyncManager.active = true;
+                setTimeout(function () { SyncManager.start(); }, 1000);
+            }
+        } else {
+            if (manualSearch) manualSearch.style.display = 'block';
+            if (rescanBtn) rescanBtn.style.display = 'inline-flex';
+        }
+    }
+};
+var SyncManager = {
+    active: false,
+    timer: null,
+    lastTime: 0,
+    lastProcessedEAN: null,
+    lastProcessedTimestamp: null,
+    lastNotifiedEAN: null,
+    lastNotifiedTime: 0,
+    errors: 0,
+    MAX_ERRORS: 5,
+    interval: 3000,
+    baseInterval: 3000,
+    updateIntervalForPerf: function () {
+        if (typeof AppConfig !== 'undefined' && AppConfig.lowPerf) {
+            this.baseInterval = 6000;
+        } else {
+            this.baseInterval = 2500;
+        }
+        this.interval = this.baseInterval;
+    },
+    init: function () {
+        var self = this;
+        this.updateIntervalForPerf();
+        document.addEventListener('visibilitychange', function () {
+            if (document.hidden) {
+                self.stop();
+            } else {
+                if (self.active) {
+                    self.start();
+                }
+            }
+        });
+        window.addEventListener('online', function () {
+            UI.setStatus('Conexión restablecida', 'success');
+            self.errors = 0;
+            self.updateIntervalForPerf();
+            var btn = document.getElementById('sync-btn');
+            if (btn && self.active) {
+                btn.style.borderColor = 'var(--success)';
+            }
+            if (self.active) {
+                self.start();
+            }
+        });
+    },
+    isCircuitBroken: function () {
+        return this.errors >= this.MAX_ERRORS;
+    },
+    toggle: function () {
+        this.active = !this.active;
+        var btn = document.getElementById('sync-btn');
+        if (this.active) {
+            this.errors = 0;
+            this.updateIntervalForPerf();
+            if (btn) {
+                btn.classList.add('sync-active');
+                btn.style.borderColor = 'var(--success)';
+                btn.title = "Sincronizando Línea " + AppConfig.line;
+            }
+            this.start();
+        } else {
+            this.stop();
+            if (btn) {
+                btn.classList.remove('sync-active');
+                btn.style.borderColor = '';
+                btn.style.animation = 'none';
+                btn.title = "Sincronizar (OFF)";
+            }
+        }
+    },
+    start: function () {
+        this.stop();
+        if (document.hidden) return;
+        this.poll();
+    },
+    stop: function () {
+        if (this.timer) {
+            clearTimeout(this.timer);
+            this.timer = null;
+        }
+    },
+    adjustInterval: function (success) {
+        if (success) {
+            if (this.interval > this.baseInterval) {
+                this.interval = this.baseInterval;
+            }
+            this.errors = 0;
+            var btn = document.getElementById('sync-btn');
+            if (btn) btn.style.borderColor = 'var(--success)';
+        } else {
+            this.errors++;
+            if (this.errors > 2 && this.interval < 10000) {
+                this.interval = 10000;
+            }
+            if (this.isCircuitBroken()) {
+                this.interval = 15000;
+                UI.setStatus('Reconectando red...', 'warning');
+                var btn = document.getElementById('sync-btn');
+                if (btn) {
+                    btn.style.borderColor = 'var(--warning)';
+                }
+            }
+        }
+    },
+    poll: function () {
+        if (!this.active) return;
+        var self = this;
+        var controller = new AbortController();
+        var id = setTimeout(function () { controller.abort(); }, 5000);
+        fetch('api/sync_line.php?line=' + AppConfig.line, { signal: controller.signal })
+            .then(function (res) { return res.json(); })
+            .then(function (data) {
+                clearTimeout(id);
+                self.adjustInterval(true);
+                if (data.success && data.data) {
+                    var isViewer = AppConfig.puesto > 1;
+                    if (data.data.timestamp > self.lastTime || (isViewer && self.lastTime === 0)) {
+                        var isRecent = (Date.now() / 1000) - data.data.timestamp < 60;
+                        if (data.data.puesto_origen == AppConfig.puesto && !isViewer) {
+                            self.lastTime = data.data.timestamp;
+                            return;
+                        }
+                        if (self.lastTime === data.data.timestamp && !isViewer) return;
+                        self.lastTime = data.data.timestamp;
+                        if (!isRecent && !isViewer) return;
+                        
+                        // Si el puesto visor ya está mostrando esta misma orden, no reiniciar ni recrear la UI
+                        if (isViewer && self.lastProcessedEAN === data.data.ean) {
+                            return;
+                        }
+                        self.lastProcessedEAN = data.data.ean;
+                        self.lastProcessedTimestamp = data.data.timestamp;
 
+                        var container = document.querySelector('.scanner-container');
+                        if (container) container.classList.remove('has-image');
+                        var viewerScreen = document.querySelector('.viewer-mode-screen');
+                        if (viewerScreen) viewerScreen.style.display = 'flex';
+                        var statusBar = document.querySelector('.status-bar');
+                        if (statusBar) statusBar.classList.remove('hidden');
+                        var existingImg = document.getElementById('product-image');
+                        if (existingImg) existingImg.remove();
+                        
+                        if (isViewer) {
+                            UI.setStatus('Plano sincronizado', 'success');
+                            var navProdViewer = document.getElementById('nav-scanned-product');
+                            if (navProdViewer) navProdViewer.innerText = 'NUEVA ORDEN: ' + data.data.desc;
+                            AudioHandler.vibrate([100, 100, 100]);
+                            AudioHandler.beep('success');
+
+                            DataManager.searchCode(data.data.ean)
+                                .then(function (localData) {
+                                    if (localData.encontrado && (localData.pdf_url || localData.img_url)) {
+                                        var newPdf = localData.pdf_url;
+                                        var newImg = localData.img_url;
+                                        if (newImg) {
+                                            var img = new Image();
+                                            img.id = 'product-image';
+                                            img.className = 'scanned-image-result';
+                                            img.onload = function() {
+                                                if (viewerScreen) viewerScreen.style.display = 'none';
+                                                if (statusBar) statusBar.classList.add('hidden');
+                                                if (container) {
+                                                    container.classList.add('has-image');
+                                                    container.appendChild(img);
+                                                }
+                                                document.body.classList.add('hide-navs');
+                                            };
+                                            img.onerror = function() {
+                                                if (newPdf) {
+                                                    window.open(newPdf, '_blank');
+                                                }
+                                            };
+                                            img.src = newImg;
+                                        } else if (newPdf) {
+                                            var jobDisplay = document.getElementById('viewer-current-job');
+                                            if (jobDisplay) {
+                                                jobDisplay.innerHTML =
+                                                    '<div class="job-status-msg" style="color: var(--warning); margin-top:20px;">⚠️ ABRIENDO PLANO...</div>' +
+                                                    '<a href="' + newPdf + '" target="_blank" class="manual-open-btn">ABRIR AHORA</a>';
+                                            }
+                                            setTimeout(function () {
+                                                var newWin = window.open(newPdf, '_blank');
+                                                if (!newWin || newWin.closed || typeof newWin.closed == 'undefined') {
+                                                    UI.setStatus('CLIC EN "ABRIR AHORA" REQUERIDO', 'warning');
+                                                }
+                                            }, 500);
+                                        }
+                                    } else {
+                                        var jobDisplay = document.getElementById('viewer-current-job');
+                                        if (jobDisplay) {
+                                            jobDisplay.innerHTML = '<div class="job-status-msg" style="color: var(--error); margin-top:20px;">❌ PLANO NO DISPONIBLE</div>';
+                                        }
+                                    }
+                                });
+                        } else {
+                            UI.setStatus('Recibido de P' + data.data.puesto_origen + ': ' + data.data.desc, 'success');
+                            AudioHandler.vibrate([50]);
+                            DataManager.saveItem(data.data.ean, data.data.desc + ' (P' + data.data.puesto_origen + ')', data.data.pdf, true);
+                        }
+                    }
+                }
+            })
+            .catch(function (e) {
+                clearTimeout(id);
+                self.adjustInterval(false);
+            })
+            .finally(function () {
+                if (self.active) {
+                    self.timer = setTimeout(self.poll.bind(self), self.interval);
+                }
+            });
+    },
+    notify: function (ean, desc, pdf) {
+        if (!ean) return;
+        var now = Date.now();
+        if (this.lastNotifiedEAN === ean && (now - this.lastNotifiedTime) < 30000) {
+            return;
+        }
+        this.lastNotifiedEAN = ean;
+        this.lastNotifiedTime = now;
+        var fd = new FormData();
+        fd.append('action', 'update');
+        fd.append('line', AppConfig.line);
+        fd.append('puesto', AppConfig.puesto);
+        fd.append('ean', ean);
+        fd.append('desc', desc);
+        fd.append('pdf', pdf || '');
+        fetch('api/sync_line.php', { method: 'POST', body: fd }).catch(function () { });
+    }
+};
+document.addEventListener('DOMContentLoaded', function () {
+    UI.init();
+    AppConfig.init();
+    UI.setStatus('Inicializando...', 'scanning');
     AudioHandler.init();
     DataManager.loadHistory();
     ManualSearch.init();
-
-    // Verificar libreria
+    SyncManager.init();
     if (typeof Html5Qrcode === 'undefined') {
         UI.setStatus('ERROR: Libreria no cargada', 'error');
         return;
     }
+    
+    // Toggle HUD/fullscreen on container click
+    var container = document.querySelector('.scanner-container');
+    if (container) {
+        container.addEventListener('click', function (e) {
+            // Prevent toggling when clicking on interactive elements
+            if (e.target.tagName === 'BUTTON' || e.target.closest('button') ||
+                e.target.tagName === 'A' || e.target.closest('a') ||
+                e.target.tagName === 'INPUT' || e.target.closest('input') ||
+                e.target.tagName === 'SELECT' || e.target.closest('select')) {
+                return;
+            }
+            var isHidden = document.body.classList.contains('hide-navs');
+            setHUDVisibility(isHidden); // Toggle HUD and Fullscreen
+        });
+    }
 
-    // Habilitar audio en primer toque (iOS/Android)
     document.body.addEventListener('touchstart', function () { AudioHandler.resume(); }, { once: true });
     document.body.addEventListener('click', function () { AudioHandler.resume(); }, { once: true });
-
-    // Listener para cuando el usuario vuelve a la pestaña
     document.addEventListener('visibilitychange', function () {
         Scanner.handleVisibilityChange();
     });
-
-    // Verificación periódica cada 30 segundos para asegurar que el escáner esté funcionando
     setInterval(function () {
         if (document.visibilityState === 'visible' && !Scanner.isProcessing) {
-            // Si estmos en Standby, NO hacer nada
-            if (Scanner.isStandby) return;
-
-            // Si pasaron más de 30s y el estado muestra error, reintentar (SALVO QUE SEA FATAL)
             var statusEl = document.getElementById('status-text');
-            if (statusEl && statusEl.textContent.indexOf('ERROR') !== -1 && statusEl.textContent.indexOf('FATAL') === -1) {
-                UI.addLog('Auto-recuperacion: reintentando camara', 'warning');
+            if (statusEl && statusEl.textContent.indexOf('ERROR') !== -1) {
                 Scanner.resetFlags();
                 Scanner.start();
             }
         }
     }, 30000);
-
-    // Arrancar scanner
     setTimeout(function () { Scanner.start(); }, 500);
 });
 
-// ============================================================================
-// 7. FUNCIONES GLOBALES (para onclick en HTML)
-// ============================================================================
 function switchCamera() { Scanner.switchCamera(); }
 function clearHistory() { DataManager.clearHistory(); }
-function closeSearch() { UI.toggleSearch(false); } 
+function closeSearch() { UI.toggleSearch(false); }
+
+function forceRescan() {
+    if (typeof Scanner !== 'undefined') {
+        Scanner.lastScan = { code: null, time: 0 };
+        Scanner.lastPdfCode = null;
+        Scanner.lastPdfTime = 0;
+        Scanner.isProcessing = false;
+        Scanner.isBusy = false;
+        if (Scanner.safetyTimer) {
+            clearTimeout(Scanner.safetyTimer);
+            Scanner.safetyTimer = null;
+        }
+    }
+    if (typeof SyncManager !== 'undefined') {
+        SyncManager.lastNotifiedEAN = null;
+        SyncManager.lastNotifiedTime = 0;
+    }
+
+    var reader = document.getElementById('reader');
+    var scanRegion = document.querySelector('.scan-region');
+    var img = document.getElementById('product-image');
+    var btnScan = document.getElementById('btn-scan-again');
+    var navProd = document.getElementById('nav-scanned-product');
+    var container = document.querySelector('.scanner-container');
+    var statusBar = document.querySelector('.status-bar');
+
+    setHUDVisibility(true);
+
+    if (reader) reader.style.display = 'block';
+    if (scanRegion) scanRegion.style.display = 'block';
+    if (img) img.remove();
+    if (btnScan) btnScan.style.display = 'none';
+    if (navProd) navProd.innerText = '';
+    if (container) container.classList.remove('has-image');
+    if (statusBar) statusBar.classList.remove('hidden');
+
+    AudioHandler.beep('success');
+    UI.flashEffect('#3b82f6');
+    UI.setStatus('Listo - Apunta el codigo', 'success');
+
+    if (typeof Scanner !== 'undefined') {
+        Scanner.start();
+    }
+}
+
+function resetScannerUI() {
+    forceRescan();
+}
+
+function toggleFullScreen() {
+    try {
+        var docEl = document.documentElement;
+        var isFullscreen = document.fullscreenElement || document.webkitFullscreenElement || document.mozFullScreenElement || document.msFullscreenElement;
+        
+        if (!isFullscreen) {
+            if (docEl.requestFullscreen) {
+                docEl.requestFullscreen();
+            } else if (docEl.webkitRequestFullscreen) {
+                docEl.webkitRequestFullscreen();
+            } else if (docEl.mozRequestFullScreen) {
+                docEl.mozRequestFullScreen();
+            } else if (docEl.msRequestFullscreen) {
+                docEl.msRequestFullscreen();
+            }
+        } else {
+            if (document.exitFullscreen) {
+                document.exitFullscreen();
+            } else if (document.webkitExitFullscreen) {
+                document.webkitExitFullscreen();
+            } else if (document.mozCancelFullScreen) {
+                document.mozCancelFullScreen();
+            } else if (document.msExitFullscreen) {
+                document.msExitFullscreen();
+            }
+        }
+    } catch (e) {
+        console.warn("Fullscreen API not supported or blocked:", e);
+    }
+}
+
+function setHUDVisibility(visible) {
+    try {
+        var docEl = document.documentElement;
+        var isFullscreen = !!(document.fullscreenElement || document.webkitFullscreenElement || document.mozFullScreenElement || document.msFullscreenElement);
+        
+        if (visible) {
+            document.body.classList.remove('hide-navs');
+            if (isFullscreen) {
+                if (document.exitFullscreen) {
+                    document.exitFullscreen();
+                } else if (document.webkitExitFullscreen) {
+                    document.webkitExitFullscreen();
+                } else if (document.mozCancelFullScreen) {
+                    document.mozCancelFullScreen();
+                } else if (document.msExitFullscreen) {
+                    document.msExitFullscreen();
+                }
+            }
+        } else {
+            document.body.classList.add('hide-navs');
+            if (!isFullscreen) {
+                if (docEl.requestFullscreen) {
+                    docEl.requestFullscreen();
+                } else if (docEl.webkitRequestFullscreen) {
+                    docEl.webkitRequestFullscreen();
+                } else if (docEl.mozRequestFullScreen) {
+                    docEl.mozRequestFullScreen();
+                } else if (docEl.msRequestFullscreen) {
+                    docEl.msRequestFullscreen();
+                }
+            }
+        }
+    } catch (e) {
+        console.warn("HUD visibility toggle error:", e);
+    }
+}

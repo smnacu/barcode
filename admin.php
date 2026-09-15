@@ -1,3 +1,10 @@
+<?php
+session_start([
+    'cookie_httponly' => true,
+    'cookie_samesite' => 'Strict'
+]);
+$isAuth = isset($_SESSION['auth']) && $_SESSION['auth'] === true;
+?>
 <!DOCTYPE html>
 <html lang="es">
 
@@ -504,6 +511,7 @@
     <!-- TOAST -->
     <div class="toast" id="toast"></div>
 
+<?php if (!$isAuth): ?>
     <!-- LOGIN OVERLAY -->
     <div id="login-overlay">
         <div class="login-box">
@@ -514,14 +522,14 @@
             <button onclick="doLogin()" class="btn btn-primary" style="width:100%" id="login-btn">Entrar</button>
             <p id="login-error" class="login-error">Clave incorrecta</p>
             <div class="login-footer">
-                <a href="index.html">← Volver al Scanner</a>
+                <a href="index.php">← Volver al Scanner</a>
                 <p style="margin-top: 24px; font-size: 10px; opacity: 0.5;">Daruma Consulting SRL</p>
             </div>
         </div>
     </div>
-
+<?php else: ?>
     <!-- ADMIN CONTENT -->
-    <div id="admin-content">
+    <div id="admin-content" class="visible">
         <header class="app-header">
             <div class="header-left">
                 <img src="img/logo_bw.png" alt="Logo" class="header-logo">
@@ -534,7 +542,7 @@
             <div class="admin-log" id="admin-log">Sin eventos</div>
             <div class="header-right">
                 <button onclick="doLogout()" class="btn btn-secondary btn-sm">Salir</button>
-                <a href="index.html" class="btn btn-secondary btn-sm">Scanner</a>
+                <a href="index.php" class="btn btn-secondary btn-sm">Scanner</a>
             </div>
         </header>
 
@@ -545,15 +553,44 @@
                     <label>📂 Ruta PDFs (Servidor)</label>
                     <div class="input-with-btn">
                         <input type="text" id="config-pdf-path" placeholder="http://192.168.170.160/PDF-EXPGRIFERIA/">
-                        <button onclick="testConnection()" class="btn btn-warning btn-sm" id="test-conn-btn">
-                            🔗 Probar
-                        </button>
+                        <button onclick="testConnection()" class="btn btn-secondary" id="test-conn-btn">🔗 Probar</button>
                     </div>
                     <div id="connection-status" style="margin-top: 6px;"></div>
                 </div>
                 <div class="input-group">
                     <label>📄 Base de Datos Activa (CSV)</label>
                     <select id="config-csv-active"></select>
+                </div>
+                <div class="input-group">
+                    <label>🔗 Sufijo Puesto 1 (Armado)</label>
+                    <select id="config-sufijo-puesto-1">
+                        <option value="">Ninguno (Normal)</option>
+                        <option value="P1">Puesto 1 (_P1)</option>
+                        <option value="P2">Puesto 2 (_P2)</option>
+                        <option value="P3">Puesto 3 (_P3)</option>
+                    </select>
+                </div>
+                <div class="input-group">
+                    <label>🔗 Sufijo Puesto 2 (Control)</label>
+                    <select id="config-sufijo-puesto-2">
+                        <option value="">Ninguno (Normal)</option>
+                        <option value="P1">Puesto 1 (_P1)</option>
+                        <option value="P2">Puesto 2 (_P2)</option>
+                        <option value="P3">Puesto 3 (_P3)</option>
+                    </select>
+                </div>
+                <div class="input-group">
+                    <label>🔗 Sufijo Puesto 3 (Empaque)</label>
+                    <select id="config-sufijo-puesto-3">
+                        <option value="">Ninguno (Normal)</option>
+                        <option value="P1">Puesto 1 (_P1)</option>
+                        <option value="P2">Puesto 2 (_P2)</option>
+                        <option value="P3">Puesto 3 (_P3)</option>
+                    </select>
+                </div>
+                <div class="input-group" style="flex: 0 0 auto; display: flex; align-items: center; gap: 8px; min-width: 220px; height: 38px; margin-top: 24px; border: none;">
+                    <input type="checkbox" id="config-usar-sufijos-puesto" style="width: 18px !important; height: 18px !important; margin: 0 !important; padding: 0 !important; cursor: pointer;">
+                    <label for="config-usar-sufijos-puesto" style="margin: 0; cursor: pointer; font-weight: 600; font-size: 12px; color: var(--text-muted);">Habilitar sufijos por puesto</label>
                 </div>
                 <div style="flex: 0 0 auto;">
                     <button onclick="saveConfiguration()" class="btn btn-primary" id="save-config-btn">
@@ -584,6 +621,45 @@
                 </div>
             </section>
 
+            <!-- EDITOR MANUAL -->
+            <section class="toolbar" style="align-items: flex-start;">
+                <div style="flex: 1; min-width: 300px;">
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+                        <h3 style="margin:0; color: var(--text-muted); font-size:14px;">📘 Editor de Manual</h3>
+                        <small style="color: var(--text-muted);">Edite y guarde para aplicar cambios</small>
+                    </div>
+
+                    <div style="display: flex; gap: 10px; height: 250px;">
+                        <!-- List -->
+                        <div
+                            style="flex: 0 0 200px; border: 1px solid rgba(128,128,128,0.2); border-radius: 6px; overflow-y: auto; background: var(--bg-input);">
+                            <div id="faq-list-admin" style="display: flex; flex-direction: column;">
+                                <!-- Items will be here -->
+                            </div>
+                        </div>
+                        <!-- Form -->
+                        <div style="flex: 1; display: flex; flex-direction: column; gap: 10px;">
+                            <input type="hidden" id="faq-id">
+                            <input type="text" id="faq-title" placeholder="Título"
+                                style="width: 100%; padding: 8px; background: var(--bg-input); color: var(--text-main); border: 1px solid rgba(128,128,128,0.3); border-radius: 4px;">
+                            <textarea id="faq-content" placeholder="Contenido (acepta saltos de línea)"
+                                style="flex: 1; resize: none; padding: 8px; background: var(--bg-input); color: var(--text-main); border: 1px solid rgba(128,128,128,0.3); border-radius: 4px; font-family: inherit;"></textarea>
+                            <div style="display: flex; gap: 8px; justify-content: flex-end;">
+                                <button onclick="newFaq()" class="btn btn-secondary btn-sm">Limpiar / Nuevo</button>
+                                <button onclick="deleteFaq()" class="btn btn-warning btn-sm">Eliminar</button>
+                                <button onclick="saveFaqLocal()" class="btn btn-primary btn-sm">Aplicar</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div style="flex: 0 0 auto; display: flex; flex-direction: column; gap: 10px; margin-left: 10px;">
+                    <button onclick="commitFaq()" class="btn btn-success" id="save-faq-server-btn"
+                        style="height: 100%;">
+                        💾 Guardar<br>Todo
+                    </button>
+                </div>
+            </section>
+
             <!-- TABLA -->
             <div class="table-container">
                 <div class="table-header">
@@ -601,10 +677,12 @@
             <div class="footer-credit">Daruma Consulting SRL</div>
         </div>
     </div>
+<?php endif; ?>
 
     <script>
         var API = 'api/admin.php';
         var currentEditingFile = '';
+        var faqData = [];
 
         // =====================================================================
         // TEMA
@@ -636,24 +714,22 @@
         // INICIALIZACION
         // =====================================================================
         document.addEventListener('DOMContentLoaded', function () {
-            checkAuth();
-            document.getElementById('admin-pass').addEventListener('keypress', function (e) {
-                if (e.key === 'Enter') doLogin();
-            });
+            var passInput = document.getElementById('admin-pass');
+            if (passInput) {
+                passInput.addEventListener('keypress', function (e) {
+                    if (e.key === 'Enter') doLogin();
+                });
+            }
+            <?php if ($isAuth): ?>
+            loadConfig();
+            loadFaqFromServer();
+            logEvent('Sesión de administración activa');
+            <?php endif; ?>
         });
 
         // =====================================================================
         // AUTENTICACION
         // =====================================================================
-        function checkAuth() {
-            fetch(API + '?action=check_auth')
-                .then(function (r) { return r.json(); })
-                .then(function (data) {
-                    if (data.auth) showAdmin();
-                })
-                .catch(function () { });
-        }
-
         function doLogin() {
             var btn = document.getElementById('login-btn');
             var pass = document.getElementById('admin-pass').value;
@@ -669,7 +745,7 @@
                 .then(function (r) { return r.json(); })
                 .then(function (data) {
                     if (data.status === 'ok') {
-                        showAdmin();
+                        location.reload();
                     } else {
                         document.getElementById('login-error').style.display = 'block';
                         btn.disabled = false;
@@ -694,6 +770,7 @@
             document.getElementById('login-overlay').classList.add('hidden');
             document.getElementById('admin-content').classList.add('visible');
             loadConfig();
+            loadFaqFromServer();
             logEvent('Usuario autenticado');
         }
 
@@ -715,6 +792,30 @@
                 .then(function (r) { return r.json(); })
                 .then(function (data) {
                     document.getElementById('config-pdf-path').value = data.config.pdf_path || '';
+                    
+                    var suf1 = data.config.sufijo_puesto_1 !== undefined ? data.config.sufijo_puesto_1 : 'P1';
+                    var suf2 = data.config.sufijo_puesto_2 !== undefined ? data.config.sufijo_puesto_2 : 'P2';
+                    var suf3 = data.config.sufijo_puesto_3 !== undefined ? data.config.sufijo_puesto_3 : 'P3';
+
+                    // Si hay una config global forzada en la config vieja
+                    var forzarGlobal = data.config.forzar_sufijo || '';
+                    if (forzarGlobal === '' && data.config.forzar_p1) {
+                        forzarGlobal = 'P1';
+                    }
+                    if (forzarGlobal !== '') {
+                        suf1 = forzarGlobal;
+                        suf2 = forzarGlobal;
+                        suf3 = forzarGlobal;
+                    }
+
+                    document.getElementById('config-sufijo-puesto-1').value = suf1;
+                    document.getElementById('config-sufijo-puesto-2').value = suf2;
+                    document.getElementById('config-sufijo-puesto-3').value = suf3;
+
+                    var usarSufijos = data.config.usar_sufijos_puesto !== undefined 
+                        ? !!data.config.usar_sufijos_puesto 
+                        : (data.config.forzar_p1 || (data.config.forzar_sufijo && data.config.forzar_sufijo !== ''));
+                    document.getElementById('config-usar-sufijos-puesto').checked = usarSufijos;
 
                     var selActive = document.getElementById('config-csv-active');
                     var selEditor = document.getElementById('editor-csv-select');
@@ -792,6 +893,22 @@
             fd.append('action', 'save_config');
             fd.append('pdf_path', document.getElementById('config-pdf-path').value);
             fd.append('active_csv', document.getElementById('config-csv-active').value);
+            
+            var suf1 = document.getElementById('config-sufijo-puesto-1').value;
+            var suf2 = document.getElementById('config-sufijo-puesto-2').value;
+            var suf3 = document.getElementById('config-sufijo-puesto-3').value;
+
+            fd.append('sufijo_puesto_1', suf1);
+            fd.append('sufijo_puesto_2', suf2);
+            fd.append('sufijo_puesto_3', suf3);
+
+            var usarSufijos = document.getElementById('config-usar-sufijos-puesto').checked;
+            fd.append('usar_sufijos_puesto', usarSufijos ? 'true' : 'false');
+
+            // Mapear compatibilidad si todos tienen el mismo sufijo (siempre y cuando usarSufijos este habilitado)
+            var forzarGlobal = (usarSufijos && suf1 === suf2 && suf2 === suf3) ? suf1 : '';
+            fd.append('forzar_sufijo', forzarGlobal);
+            fd.append('forzar_p1', forzarGlobal === 'P1' ? 'true' : 'false');
 
             fetch(API, { method: 'POST', body: fd })
                 .then(function (r) { return r.json(); })
@@ -811,6 +928,111 @@
                     btn.innerHTML = '💾 Guardar Config';
                 });
         }
+
+        // =====================================================================
+        // FAQ MANAGER
+        // =====================================================================
+        function loadFaqFromServer() {
+            fetch(API + '?action=get_faq')
+                .then(function (r) { return r.json(); })
+                .then(function (data) {
+                    faqData = data || [];
+                    renderFaqAdmin();
+                });
+        }
+
+        function renderFaqAdmin() {
+            var container = document.getElementById('faq-list-admin');
+            container.innerHTML = '';
+            faqData.forEach(function (item, idx) {
+                var div = document.createElement('div');
+                div.style.padding = '8px';
+                div.style.cursor = 'pointer';
+                div.style.borderBottom = '1px solid rgba(128,128,128,0.1)';
+                div.textContent = item.title;
+                div.onclick = function () { editFaq(idx); };
+                container.appendChild(div);
+            });
+        }
+
+        function editFaq(idx) {
+            var item = faqData[idx];
+            document.getElementById('faq-id').value = item.id;
+            document.getElementById('faq-title').value = item.title;
+            document.getElementById('faq-content').value = item.content;
+            document.getElementById('faq-id').dataset.idx = idx;
+        }
+
+        function newFaq() {
+            document.getElementById('faq-id').value = '';
+            document.getElementById('faq-id').dataset.idx = '';
+            document.getElementById('faq-title').value = '';
+            document.getElementById('faq-content').value = '';
+        }
+
+        function saveFaqLocal() {
+            var title = document.getElementById('faq-title').value;
+            var content = document.getElementById('faq-content').value;
+            var idx = document.getElementById('faq-id').dataset.idx;
+
+            if (!title) {
+                showToast('El título es requerido', 'warning');
+                return;
+            }
+
+            if (idx !== '' && idx !== undefined && idx !== null) {
+                // Update
+                faqData[idx].title = title;
+                faqData[idx].content = content;
+            } else {
+                // Create
+                var newId = 1;
+                if (faqData.length > 0) {
+                    // Find max id
+                    faqData.forEach(function (i) { if (i.id >= newId) newId = i.id + 1; });
+                }
+                faqData.push({ id: newId, title: title, content: content });
+            }
+            renderFaqAdmin();
+            newFaq();
+            showToast('Item actualizado (recuerde Guardar Todo)', 'success');
+        }
+
+        function deleteFaq() {
+            var idx = document.getElementById('faq-id').dataset.idx;
+            if (idx !== '' && idx !== undefined) {
+                if (confirm('Eliminar este item?')) {
+                    faqData.splice(idx, 1);
+                    renderFaqAdmin();
+                    newFaq();
+                }
+            }
+        }
+
+        function commitFaq() {
+            var btn = document.getElementById('save-faq-server-btn');
+            btn.disabled = true;
+            btn.innerHTML = '...';
+
+            var fd = new FormData();
+            fd.append('action', 'save_faq');
+            fd.append('content', JSON.stringify(faqData));
+
+            fetch(API, { method: 'POST', body: fd })
+                .then(function (r) { return r.json(); })
+                .then(function (data) {
+                    if (data.status === 'ok') {
+                        showToast('Manual guardado correctamente', 'success');
+                    } else {
+                        showToast('Error al guardar', 'error');
+                    }
+                })
+                .finally(function () {
+                    btn.disabled = false;
+                    btn.innerHTML = '💾 Guardar<br>Todo';
+                });
+        }
+
 
         // =====================================================================
         // DATOS CSV

@@ -1,0 +1,4 @@
+# Prohibir ejecución de scripts en la carpeta de CSVs
+<FilesMatch "\.(php|phtml|php3|php4|php5|phps|cgi|pl)$">
+    Require all denied
+</FilesMatch>

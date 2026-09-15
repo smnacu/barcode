@@ -10,7 +10,7 @@ Gestión de Memoria Inteligente: El sistema "apaga" y libera los recursos de la 
 Visualización Híbrida: * Detecta automáticamente si el PDF está en el servidor local o intranet.Visualizador integrado (sin descargas innecesarias).
 Interfaz Touch-Friendly: Botones grandes y navegación fluida pensada para guantes o pantallas táctiles.
 🛠 Para el Administrador (Backend)
-Panel de Control Centralizado: Interfaz visual (admin.html) protegida para gestión del sistema.
+Panel de Control Centralizado: Interfaz visual (admin.php) protegida para gestión del sistema.
 ABM de Datos (CSV): 
 * Edición de celdas tipo Excel directamente en el navegador.
 Alta, Baja y Modificación de registros sin tocar el servidor por FTP.
@@ -29,8 +29,8 @@ Estructura de Carpetas:Copiar los archivos manteniendo la estructura:
 ├── csv/       (Base de datos)
 ├── js/        (Lógica frontend y librerías)
 ├── Pdf/       (Repositorio de documentos)
-├── admin.html (Panel de control)
-└── index.html (App Operario)
+├── admin.php (Panel de control)
+└── index.php (App Operario)
 Permisos (CRÍTICO):Para que el panel de administración funcione, el usuario del servidor web (www-data, apache, etc.) debe tener permisos de escritura en:Carpeta csv/ (Para guardar/subir bases de datos).Carpeta api/ (Para generar el config.json).Comando rápido: chmod -R 775 csv/ api/🛡️ Seguridad y MantenimientoSanitización: Todas las entradas vía PHP están sanitizadas para prevenir inyecciones básicas en los archivos CSV.Modo Kiosco: Se recomienda configurar el navegador de la tablet en modo "Pantalla Completa" para evitar salidas accidentales de la app.
 
-👥 AutoríaDesarrollado y mantenido por Santiago M. Nacucchio para Daruma Consulting SRL.Innovación tecnológica aplicada a procesos productivos.© 2025 Daruma Consulting SRL. Todos los derechos reservados.
+👥 Autoría Desarrollado y mantenido por Santiago M. Nacucchio para Daruma Consulting SRL.Innovación tecnológica aplicada a procesos productivos.© 2025 Daruma Consulting SRL. Todos los derechos reservados.

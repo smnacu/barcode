@@ -1,0 +1,5 @@
+﻿<?php
+// Acceso directo para Linea 1 - Puesto 1 (Scanner)
+header("Location: ../index.php?line=1&puesto=1");
+exit;
+?>

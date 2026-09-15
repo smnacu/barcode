@@ -1,0 +1,7 @@
+# Accesos Directos
+Estos archivos PHP sirven para configurar automáticamente el puesto y la línea.
+Para agregar más, simplemente copia uno y cambia los parámetros en la URL:
+`../index.php?line=NUMERO&puesto=NUMERO`
+
+- line: Número de la linea de producción (1 a 4)
+- puesto: 1 (Scanner), 2 o 3 (Visores)

@@ -7,6 +7,7 @@ session_start();
 header('Content-Type: application/json');
 
 $config_file = __DIR__ . '/config.json';
+$faq_file = __DIR__ . '/../data/faq.json';
 
 // Cargar config para obtener la contraseña
 $config_data = file_exists($config_file) ? json_decode(file_get_contents($config_file), true) : [];
@@ -18,9 +19,20 @@ $action = $_POST['action'] ?? $_GET['action'] ?? '';
 // ACCIONES PÚBLICAS (sin autenticación)
 // ============================================================================
 
+if ($action === 'get_faq') {
+    if (file_exists($faq_file)) {
+        header('Content-Type: application/json');
+        echo file_get_contents($faq_file);
+    } else {
+        echo json_encode([]);
+    }
+    exit;
+}
+
 if ($action === 'login') {
     $pass = $_POST['password'] ?? '';
     if ($pass === $PASSWORD) {
+        session_regenerate_id(true);
         $_SESSION['auth'] = true;
         echo json_encode(['status' => 'ok', 'success' => true]);
     } else {
@@ -62,7 +74,13 @@ function loadConfig() {
     $defaults = [
         'ruta_pdf' => 'http://192.168.170.160/PDF-EXPGRIFERIA/',
         'ruta_csv' => '../csv/0codigos.csv',
-        'timeout_segundos' => 10
+        'timeout_segundos' => 10,
+        'forzar_p1' => false,
+        'forzar_sufijo' => '',
+        'sufijo_puesto_1' => 'P1',
+        'sufijo_puesto_2' => 'P2',
+        'sufijo_puesto_3' => 'P3',
+        'usar_sufijos_puesto' => false
     ];
     
     if (file_exists($config_file)) {
@@ -96,15 +114,58 @@ function readCSV($filename) {
     return $rows;
 }
 
-function writeCSV($filename, $data) {
+// Helper para modificaciones atómicas con bloqueo
+function modifyCSV($filename, callable $callback) {
     $path = $filename;
     if (strpos($path, '/') === false && strpos($path, '\\') === false) {
         $path = __DIR__ . '/../csv/' . $filename;
     }
 
-    if ($fp = fopen($path, 'w')) {
-        foreach ($data as $fields) {
+    $fp = fopen($path, 'c+'); // Read/Write, no truncate yet
+    if (!$fp) return false;
+
+    if (!flock($fp, LOCK_EX)) {
+        fclose($fp);
+        return false;
+    }
+
+    // Read
+    $rows = [];
+    while (($data = fgetcsv($fp, 0, ";")) !== FALSE) {
+        $rows[] = $data;
+    }
+
+    // Callback changes data
+    $newRows = $callback($rows);
+
+    if ($newRows !== false) {
+        // Rewind and write
+        ftruncate($fp, 0);
+        rewind($fp);
+        foreach ($newRows as $fields) {
             fputcsv($fp, $fields, ";");
+        }
+    }
+
+    flock($fp, LOCK_UN);
+    fclose($fp);
+    return true;
+}
+
+function writeCSV($filename, $data) {
+    // Legacy support or specific overwrites (use modifyCSV for concurrent edits)
+    $path = $filename;
+    if (strpos($path, '/') === false && strpos($path, '\\') === false) {
+        $path = __DIR__ . '/../csv/' . $filename;
+    }
+    if ($fp = fopen($path, 'c+')) {
+        if (flock($fp, LOCK_EX)) {
+            ftruncate($fp, 0);
+            rewind($fp);
+            foreach ($data as $fields) {
+                fputcsv($fp, $fields, ";");
+            }
+            flock($fp, LOCK_UN);
         }
         fclose($fp);
         return true;
@@ -136,14 +197,20 @@ $target_csv = $_POST['target_csv'] ?? basename($config['ruta_csv']);
 switch ($action) {
     case 'get_config':
         $csv_files = getCsvFiles();
-        // Mapear para compatibilidad con admin.html
+        // Mapear para compatibilidad con admin.php
         echo json_encode([
             'config' => [
                 'pdf_path' => $config['ruta_pdf'],
                 'active_csv' => basename($config['ruta_csv']),
                 'ruta_pdf' => $config['ruta_pdf'],
                 'ruta_csv' => $config['ruta_csv'],
-                'timeout_segundos' => $config['timeout_segundos']
+                'timeout_segundos' => $config['timeout_segundos'],
+                'forzar_p1' => $config['forzar_p1'] ?? false,
+                'forzar_sufijo' => $config['forzar_sufijo'] ?? '',
+                'sufijo_puesto_1' => $config['sufijo_puesto_1'] ?? '',
+                'sufijo_puesto_2' => $config['sufijo_puesto_2'] ?? 'P2',
+                'sufijo_puesto_3' => $config['sufijo_puesto_3'] ?? 'P3',
+                'usar_sufijos_puesto' => $config['usar_sufijos_puesto'] ?? false
             ],
             'csv_files' => $csv_files
         ]);
@@ -153,7 +220,13 @@ switch ($action) {
         $new_config = [
             'ruta_pdf' => $_POST['pdf_path'] ?? $config['ruta_pdf'],
             'ruta_csv' => '../csv/' . ($_POST['active_csv'] ?? basename($config['ruta_csv'])),
-            'timeout_segundos' => (int)($config['timeout_segundos'] ?? 10)
+            'timeout_segundos' => (int)($config['timeout_segundos'] ?? 10),
+            'forzar_p1' => isset($_POST['forzar_p1']) && ($_POST['forzar_p1'] === '1' || $_POST['forzar_p1'] === 'true'),
+            'forzar_sufijo' => $_POST['forzar_sufijo'] ?? '',
+            'sufijo_puesto_1' => $_POST['sufijo_puesto_1'] ?? '',
+            'sufijo_puesto_2' => $_POST['sufijo_puesto_2'] ?? 'P2',
+            'sufijo_puesto_3' => $_POST['sufijo_puesto_3'] ?? 'P3',
+            'usar_sufijos_puesto' => isset($_POST['usar_sufijos_puesto']) && ($_POST['usar_sufijos_puesto'] === '1' || $_POST['usar_sufijos_puesto'] === 'true')
         ];
         saveConfig($new_config);
         echo json_encode(['status' => 'ok', 'success' => true, 'msg' => 'Configuración guardada']);
@@ -197,11 +270,18 @@ switch ($action) {
 
     case 'save_csv_content':
         $filename = basename($_POST['filename'] ?? '');
+        if (strtolower(pathinfo($filename, PATHINFO_EXTENSION)) !== 'csv') {
+            echo json_encode(['success' => false, 'msg' => 'Solo se permiten archivos CSV']);
+            break;
+        }
         $content = $_POST['content'] ?? '';
-        $path = __DIR__ . '/../csv/' . $filename;
-        if (file_put_contents($path, $content) !== false) {
+        $dir = __DIR__ . '/../csv';
+        $path = $dir . '/' . $filename;
+        $tmp = $dir . '/.tmp_' . bin2hex(random_bytes(6)) . '.tmp';
+        if (file_put_contents($tmp, $content, LOCK_EX) !== false && rename($tmp, $path)) {
             echo json_encode(['success' => true, 'msg' => 'Guardado correctamente']);
         } else {
+            @unlink($tmp);
             echo json_encode(['success' => false, 'msg' => 'Error al guardar']);
         }
         break;
@@ -213,41 +293,53 @@ switch ($action) {
     case 'update_row':
         $rowIndex = (int)$_POST['index'];
         $newData = $_POST['row_data']; 
-        $allData = readCSV($target_csv);
         
-        if (isset($allData[$rowIndex])) {
-            $allData[$rowIndex] = $newData;
-            writeCSV($target_csv, $allData);
+        $success = modifyCSV($target_csv, function($rows) use ($rowIndex, $newData) {
+            if (isset($rows[$rowIndex])) {
+                $rows[$rowIndex] = $newData;
+                return $rows;
+            }
+            return false;
+        });
+
+        if ($success) {
             echo json_encode(['status' => 'ok']);
         } else {
-            echo json_encode(['status' => 'error', 'message' => 'Fila no encontrada']);
+            echo json_encode(['status' => 'error', 'message' => 'Error al actualizar (Fila no encontrada o archivo bloqueado)']);
         }
         break;
 
     case 'add_row':
-        $allData = readCSV($target_csv);
-        $allData[] = $_POST['row_data'];
-        writeCSV($target_csv, $allData);
-        echo json_encode(['status' => 'ok']);
+        $success = modifyCSV($target_csv, function($rows) {
+            $rows[] = $_POST['row_data'];
+            return $rows;
+        });
+        echo json_encode(['status' => $success ? 'ok' : 'error']);
         break;
 
     case 'add_row_top':
-        $allData = readCSV($target_csv);
-        if (count($allData) > 0) {
-            array_splice($allData, 1, 0, [$_POST['row_data']]);
-        } else {
-            $allData[] = $_POST['row_data'];
-        }
-        writeCSV($target_csv, $allData);
-        echo json_encode(['status' => 'ok']);
+        $success = modifyCSV($target_csv, function($rows) {
+            if (count($rows) > 0) {
+                array_splice($rows, 1, 0, [$_POST['row_data']]);
+            } else {
+                $rows[] = $_POST['row_data'];
+            }
+            return $rows;
+        });
+        echo json_encode(['status' => $success ? 'ok' : 'error']);
         break;
 
     case 'delete_row':
         $rowIndex = (int)$_POST['index'];
-        $allData = readCSV($target_csv);
-        if (isset($allData[$rowIndex])) {
-            array_splice($allData, $rowIndex, 1);
-            writeCSV($target_csv, $allData);
+        $success = modifyCSV($target_csv, function($rows) use ($rowIndex) {
+            if (isset($rows[$rowIndex])) {
+                array_splice($rows, $rowIndex, 1);
+                return $rows;
+            }
+            return false;
+        });
+        
+        if ($success) {
             echo json_encode(['status' => 'ok']);
         } else {
             echo json_encode(['status' => 'error']);
@@ -257,14 +349,36 @@ switch ($action) {
     case 'upload_csv':
         if (isset($_FILES['file']) || isset($_FILES['archivo_csv'])) {
             $file = $_FILES['file'] ?? $_FILES['archivo_csv'];
-            $target = __DIR__ . "/../csv/" . basename($file['name']);
+            $ext = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
+            if ($ext !== 'csv') {
+                http_response_code(400);
+                echo json_encode(['status' => 'error', 'success' => false, 'msg' => 'Solo se permiten archivos con extensión .csv']);
+                break;
+            }
+
+            $cleanName = preg_replace('/[^a-zA-Z0-9_\-]/', '_', pathinfo($file['name'], PATHINFO_FILENAME)) . '.csv';
+            $target = __DIR__ . "/../csv/" . $cleanName;
             if (move_uploaded_file($file['tmp_name'], $target)) {
-                echo json_encode(['status' => 'ok', 'success' => true, 'msg' => 'Archivo subido', 'filename' => basename($file['name'])]);
+                echo json_encode(['status' => 'ok', 'success' => true, 'msg' => 'Archivo subido', 'filename' => $cleanName]);
             } else {
                 echo json_encode(['status' => 'error', 'success' => false, 'msg' => 'Error al subir archivo']);
             }
         } else {
             echo json_encode(['status' => 'error', 'success' => false, 'msg' => 'No se recibió archivo']);
+        }
+        break;
+
+    case 'save_faq':
+        $content = $_POST['content'] ?? '[]';
+        $decoded = json_decode($content);
+        if ($decoded === null && json_last_error() !== JSON_ERROR_NONE) {
+            echo json_encode(['status' => 'error', 'msg' => 'Formato JSON inválido']);
+            break;
+        }
+        if (file_put_contents($faq_file, $content, LOCK_EX) !== false) {
+            echo json_encode(['status' => 'ok', 'success' => true]);
+        } else {
+            echo json_encode(['status' => 'error', 'msg' => 'Error writing file']);
         }
         break;
 

@@ -1,24 +1,26 @@
 /**
  * Service Worker - Cache PWA mejorado
- * Estrategia: Network-first para HTML/JS, Cache-first para assets estaticos
+ * Estrategia: Network-first para HTML/PHP/JS, Cache-first para assets estaticos
  */
 
-var CACHE_NAME = 'barcodeC-v3';
+var CACHE_NAME = 'barcodeC-v5';
 
 var urlsToCache = [
     './',
-    './index.html',
-    './admin.html',
+    './index.php',
+    './admin.php',
     './manifest.json',
+    './css/styles.css',
     './js/app.js',
     './js/libs/html5-qrcode.min.js',
     './img/logo_bw.png',
-    './img/logo.png'
+    './img/logo.png',
+    './img/favicon.png'
 ];
 
 // Instalacion
 self.addEventListener('install', function (event) {
-    console.log('[SW] Instalando v3...');
+    console.log('[SW] Instalando v5...');
     event.waitUntil(
         caches.open(CACHE_NAME).then(function (cache) {
             return Promise.all(
@@ -37,7 +39,7 @@ self.addEventListener('install', function (event) {
 
 // Activacion - limpiar caches viejos
 self.addEventListener('activate', function (event) {
-    console.log('[SW] Activando...');
+    console.log('[SW] Activando v4...');
     event.waitUntil(
         caches.keys().then(function (cacheNames) {
             return Promise.all(
@@ -59,23 +61,28 @@ self.addEventListener('activate', function (event) {
 self.addEventListener('fetch', function (event) {
     var request = event.request;
 
-    // Solo GET
+    // Solo peticiones GET
     if (request.method !== 'GET') return;
 
-    // APIs siempre desde red
+    // APIs siempre desde la red; si no hay conexion, emitir offline: true
     if (request.url.indexOf('/api/') !== -1) {
         event.respondWith(
             fetch(request).catch(function () {
-                return new Response(JSON.stringify({ error: true, mensaje: 'Sin conexion' }), {
-                    headers: { 'Content-Type': 'application/json' }
+                return new Response(JSON.stringify({ error: true, offline: true, mensaje: 'Sin conexion' }), {
+                    headers: { 'Content-Type': 'application/json; charset=utf-8' }
                 });
             })
         );
         return;
     }
 
-    // HTML y JS: Network-first (siempre intentar actualizar)
-    if (request.url.indexOf('.html') !== -1 || request.url.indexOf('.js') !== -1) {
+    // HTML, PHP, JS y CSS: Network-first con fallback a cache
+    var isAppCore = request.url.indexOf('.html') !== -1 ||
+                    request.url.indexOf('.php') !== -1 ||
+                    request.url.indexOf('.js') !== -1 ||
+                    request.url.indexOf('.css') !== -1;
+
+    if (isAppCore) {
         event.respondWith(
             fetch(request).then(function (response) {
                 if (response && response.status === 200) {
@@ -92,7 +99,7 @@ self.addEventListener('fetch', function (event) {
         return;
     }
 
-    // Otros assets: Cache-first
+    // Otros assets (imagenes, iconos): Cache-first
     event.respondWith(
         caches.match(request).then(function (response) {
             if (response) return response;

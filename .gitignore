@@ -2,3 +2,6 @@
 *.ini
 Thumbs.db
 .DS_Store
+cgi-bin/
+api/lines/*.json
+!api/lines/.gitkeep
